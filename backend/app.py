@@ -45,7 +45,10 @@ if not etherscan_api_key:
     etherscan_api_key = None
 
 # Etherscan API URLs
-ETHERSCAN_BASE_URL = "https://api-sepolia.etherscan.io/api"  # Sepolia testnet
+ETHERSCAN_BASE_URL = "https://api.etherscan.io/v2/api"  # V2 API for all networks
+
+# 目标方法ID：bet(uint256 _teamId)
+TARGET_METHOD_ID = "0x7365870b"
 
 # --- 2. 数据库模型 (Models) ---
 
@@ -130,33 +133,23 @@ def sync_data_from_chain():
 
 # --- 4. 事件监听器：实时同步 ---
 
-def get_contract_events_from_etherscan(from_block='latest', to_block='latest', event_signature=None):
-    """使用Etherscan API获取合约事件"""
+def get_contract_transactions_from_etherscan():
+    """使用Etherscan API获取合约地址的所有交易记录"""
     if not etherscan_api_key:
         return []
     
-    params = {
-        'module': 'logs',
-        'action': 'getLogs',
-        'address': contract_address_str,
-        'fromBlock': from_block,
-        'toBlock': to_block,
-        'apikey': etherscan_api_key
-    }
-    
-    if event_signature:
-        params['topic0'] = event_signature
+    url = f"https://api.etherscan.io/v2/api?apikey={etherscan_api_key}&chainid=11155111&address={contract_address_str}&module=account&action=txlist"
     
     try:
-        response = requests.get(ETHERSCAN_BASE_URL, params=params, timeout=15)
+        response = requests.get(url, timeout=15)
         data = response.json()
         
         if data.get('status') == '1':
             return data.get('result', [])
         else:
             message = data.get('message', 'Unknown error')
-            if 'No records found' in message:
-                return []  # 没有记录是正常的，不算错误
+            if 'No transactions found' in message:
+                return []  # 没有交易是正常的，不算错误
             else:
                 print(f"Etherscan API error: {message}")
                 return []
@@ -192,45 +185,17 @@ def setup_event_listeners():
                     current_block = web3.eth.block_number
                     
                     if current_block > last_checked_block:
-                        # 使用Etherscan API获取事件
-                        from_block_hex = hex(last_checked_block + 1)
-                        to_block_hex = hex(current_block)
+                        # 使用Etherscan API获取合约交易记录
+                        from_block_int = last_checked_block + 1
+                        to_block_int = current_block
                         
-                        print(f"🔍 Querying events from block {last_checked_block + 1} to {current_block}")
+                        print(f"🔍 Querying all transactions for contract {contract_address_str}")
                         
-                        # 获取所有相关事件
-                        all_events = get_contract_events_from_etherscan(from_block_hex, to_block_hex)
+                        # 获取合约地址的交易记录
+                        transactions = get_contract_transactions_from_etherscan()
                         
-                        new_events_count = 0
-                        for event_log in all_events:
-                            try:
-                                # 使用交易哈希作为去重键
-                                tx_hash = event_log.get('transactionHash', '')
-                                if tx_hash in processed_tx_hashes:
-                                    continue  # 跳过已处理的交易
-                                
-                                # 解析事件日志
-                                topics = event_log.get('topics', [])
-                                if not topics:
-                                    continue
-                                    
-                                event_signature = topics[0]
-                                
-                                if event_signature == new_bet_signature:
-                                    handle_new_bet_from_log(event_log)
-                                    processed_tx_hashes.add(tx_hash)
-                                    new_events_count += 1
-                                elif event_signature == status_change_signature:
-                                    handle_status_change_from_log(event_log)
-                                    processed_tx_hashes.add(tx_hash)
-                                    new_events_count += 1
-                                elif event_signature == winner_selected_signature:
-                                    handle_winner_selected_from_log(event_log)
-                                    processed_tx_hashes.add(tx_hash)
-                                    new_events_count += 1
-                                    
-                            except Exception as e:
-                                print(f"Error processing event log: {e}")
+                        # 处理交易并记录新的下注
+                        new_events_count = process_transactions(transactions, processed_tx_hashes)
                         
                         last_checked_block = current_block
                         
@@ -261,17 +226,16 @@ def setup_event_listeners():
     else:
         print("Etherscan API key not configured, skipping event listener")
 
-def handle_new_bet_from_log(event_log):
-    """从Etherscan日志处理新下注事件"""
+def handle_new_bet_from_receipt_log(log):
+    """从交易收据日志处理新下注事件"""
     try:
-        # 解析日志数据
-        topics = event_log['topics']
-        data = event_log['data']
+        topics = log['topics']
+        data = log['data']
         
         # NewBet(address,uint256,uint256) - topics[1]是user地址，topics[2]是teamId，data是amount
-        user_address = '0x' + topics[1][26:]  # 移除前26个字符(0x + 24个0)
-        team_id = int(topics[2], 16)
-        amount_wei = str(int(data, 16))  # data是amount的hex值
+        user_address = '0x' + topics[1].hex()[26:]  # 移除前26个字符(0x + 24个0)
+        team_id = int(topics[2].hex(), 16)
+        amount_wei = str(int(data.hex(), 16))  # data是amount的hex值
         
         print(f"🎯 New bet detected: {user_address} bet {web3.from_wei(int(amount_wei), 'ether')} ETH on team {team_id}")
         
@@ -290,13 +254,106 @@ def handle_new_bet_from_log(event_log):
             print(f"Sync result: {sync_result}")
             
     except Exception as e:
-        print(f"Error handling NewBet from log: {e}")
+        print(f"Error handling NewBet from receipt log: {e}")
 
-def handle_status_change_from_log(event_log):
-    """从Etherscan日志处理状态改变事件"""
+def parse_bet_transaction(tx_data):
+    """从交易数据中解析下注信息"""
     try:
-        data = event_log['data']
-        new_status = int(data, 16)
+        # bet函数签名: bet(uint256 _teamId)
+        # 函数选择器: 0x7365870b
+        # 参数编码: uint256 (32字节)
+        
+        input_data = tx_data.get('input', '')
+        if not input_data or len(input_data) < 10:
+            return None
+            
+        # 移除0x前缀和函数选择器(8字符)
+        params_data = input_data[10:]
+        
+        if len(params_data) >= 64:  # uint256需要32字节=64个十六进制字符
+            team_id_hex = params_data[:64]  # 前32字节是teamId
+            team_id = int(team_id_hex, 16)
+            
+            return {
+                'user_address': tx_data.get('from', ''),
+                'team_id': team_id,
+                'amount_wei': str(int(tx_data.get('value', '0'), 16)),
+                'tx_hash': tx_data.get('hash', '')
+            }
+        
+        return None
+    except Exception as e:
+        print(f"Error parsing bet transaction: {e}")
+        return None
+
+def process_transactions(transactions, processed_tx_hashes):
+    """处理Etherscan API返回的交易列表，解析并存储bet交易
+    
+    Args:
+        transactions: Etherscan API返回的交易列表
+        processed_tx_hashes: 已处理的交易哈希集合，用于去重
+    
+    Returns:
+        int: 新处理的交易数量
+    """
+    new_bets_count = 0
+    
+    for tx in transactions:
+        try:
+            tx_hash = tx.get('hash', '')
+            if tx_hash in processed_tx_hashes:
+                continue  # 跳过已处理的交易
+            
+            # 检查是否是成功的bet交易
+            method_id = tx.get('methodId', '')
+            tx_status = tx.get('txreceipt_status', '0')  # 1=成功, 0=失败
+            
+            if method_id == TARGET_METHOD_ID and tx_status == '1':
+                # 解析交易输入数据
+                input_data = tx.get('input', '')
+                if len(input_data) >= 74:  # 0x + 8字节methodId + 32字节teamId
+                    # 提取teamId: input[10:74] (跳过0x和methodId)
+                    team_id_hex = input_data[10:74]
+                    team_id = int(team_id_hex, 16)
+                    
+                    # 获取下注金额 (value字段，单位为Wei)
+                    amount_wei = tx.get('value', '0')
+                    
+                    # 获取用户地址
+                    user_address = tx.get('from', '')
+                    
+                    # 获取区块号用于时间戳
+                    block_number = int(tx.get('blockNumber', '0'))
+                    
+                    print(f"🎯 New bet detected: {user_address} bet {web3.from_wei(int(amount_wei), 'ether')} ETH on team {team_id}")
+                    
+                    # 记录用户下注到数据库
+                    with app.app_context():
+                        new_bet = UserBet(
+                            user_address=user_address,
+                            team_id=team_id,
+                            amount_wei=amount_wei
+                        )
+                        db.session.add(new_bet)
+                        db.session.commit()
+                        
+                        # 触发完整同步以更新统计数据
+                        sync_result = sync_data_from_chain()
+                        print(f"Sync result: {sync_result}")
+                    
+                    processed_tx_hashes.add(tx_hash)
+                    new_bets_count += 1
+                    
+        except Exception as e:
+            print(f"Error processing transaction {tx.get('hash', 'unknown')}: {e}")
+    
+    return new_bets_count
+
+def handle_status_change_from_receipt_log(log):
+    """从交易收据日志处理状态改变事件"""
+    try:
+        data = log['data']
+        new_status = int(data.hex(), 16)
         
         status_names = ["Open", "Stopped", "Finished", "Refunding"]
         status_name = status_names[new_status] if new_status < len(status_names) else f"Unknown({new_status})"
@@ -308,16 +365,16 @@ def handle_status_change_from_log(event_log):
             sync_data_from_chain()
             
     except Exception as e:
-        print(f"Error handling GameStatusChanged from log: {e}")
+        print(f"Error handling GameStatusChanged from receipt log: {e}")
 
-def handle_winner_selected_from_log(event_log):
-    """从Etherscan日志处理获胜者选择事件"""
+def handle_winner_selected_from_receipt_log(log):
+    """从交易收据日志处理获胜者选择事件"""
     try:
-        topics = event_log['topics']
-        data = event_log['data']
+        topics = log['topics']
+        data = log['data']
         
         # WinnerSelected(uint256,string) - topics[1]是teamId，data包含teamName
-        winner_team_id = int(topics[1], 16)
+        winner_team_id = int(topics[1].hex(), 16)
         
         # 解析字符串参数（更复杂的解析，这里简化处理）
         # 实际实现需要正确解析ABI编码的字符串
@@ -330,7 +387,7 @@ def handle_winner_selected_from_log(event_log):
             sync_data_from_chain()
             
     except Exception as e:
-        print(f"Error handling WinnerSelected from log: {e}")
+        print(f"Error handling WinnerSelected from receipt log: {e}")
 
 # --- 5. API 接口 (Routes) ---
 
@@ -396,6 +453,15 @@ def reset_database():
         return jsonify({"message": "Database reset successfully"})
     except Exception as e:
         db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sync_blockchain', methods=['POST'])
+def sync_blockchain():
+    """手动触发区块链数据同步"""
+    try:
+        result = sync_data_from_chain()
+        return jsonify(result)
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/status', methods=['GET'])
