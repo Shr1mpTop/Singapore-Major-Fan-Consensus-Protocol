@@ -18,8 +18,9 @@ const nextConfig = {
     };
 
     // Add plugin to ignore problematic modules
+    const webpack = require('webpack');
     config.plugins.push(
-      new config.webpack.IgnorePlugin({
+      new webpack.IgnorePlugin({
         resourceRegExp: /^(tap|tape|why-is-node-running)$/,
       })
     );
