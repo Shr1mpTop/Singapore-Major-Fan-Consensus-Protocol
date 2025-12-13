@@ -40,7 +40,19 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
     hash,
   });
 
+  // 添加调试信息
+  console.log('TeamBetCard render:', {
+    teamId: team.id,
+    address,
+    isPending,
+    isConfirming,
+    isSuccess,
+    error: error?.message,
+    hash
+  });
+
   useEffect(() => {
+    console.log('useEffect triggered:', { isSuccess, address, hash });
     if (isSuccess && address) {
       // 记录用户下注到后端数据库（事件监听器会自动同步链上数据）
       const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5001/api';
@@ -85,8 +97,17 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
   };
 
   const handleBet = () => {
+    console.log('handleBet called');
+
     if (!betAmount || isNaN(parseFloat(betAmount)) || parseFloat(betAmount) <= 0) {
+      console.log('Invalid bet amount:', betAmount);
       alert('请输入有效的下注金额（大于0的数字）');
+      return;
+    }
+
+    if (!address) {
+      console.log('No wallet address');
+      alert('请先连接钱包');
       return;
     }
 
@@ -97,17 +118,24 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
       teamName: team.name,
       amount: betAmount,
       amountInWei: amountInWei.toString(),
-      contractAddress: CONTRACT_ADDRESS
+      contractAddress: CONTRACT_ADDRESS,
+      userAddress: address
     });
 
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: BET_ABI,
-      functionName: 'bet',
-      args: [BigInt(team.id)],
-      value: amountInWei,
-      gas: BigInt(100000), // 设置 gas limit
-    });
+    try {
+      writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: BET_ABI,
+        functionName: 'bet',
+        args: [BigInt(team.id)],
+        value: amountInWei,
+        gas: BigInt(100000), // 设置 gas limit
+      });
+      console.log('writeContract called successfully');
+    } catch (err) {
+      console.error('writeContract error:', err);
+      alert('调用合约失败，请检查控制台错误信息');
+    }
   };
 
   const handleOpenChange = (open: boolean) => {
