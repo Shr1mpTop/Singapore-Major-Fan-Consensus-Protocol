@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Force webpack instead of turbopack for compatibility
+  experimental: {
+    webpackBuildWorker: true,
+  },
+
   webpack: (config, { isServer }) => {
     // Exclude test files from certain packages that incorrectly include them
     config.resolve.fallback = {
@@ -28,10 +33,9 @@ const nextConfig = {
 
     return config;
   },
+
   // Exclude problematic packages from server components
-  experimental: {
-    serverComponentsExternalPackages: ['pino', 'thread-stream'],
-  },
+  serverExternalPackages: ['pino', 'thread-stream'],
 };
 
 module.exports = nextConfig;
