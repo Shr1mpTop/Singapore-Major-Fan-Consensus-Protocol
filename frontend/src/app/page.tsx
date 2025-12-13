@@ -344,11 +344,6 @@ function BettingSection({ teams, status, teamsLoading }: {
                         <CardTitle className="text-red-300">{team.name}</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {/* 明显的测试文本 */}
-                        <div className="bg-yellow-500 text-black p-2 mb-2 rounded text-center font-bold text-xs">
-                          🧪 测试模式 - 代码已更新
-                        </div>
-                        
                         <p className="text-sm text-red-200">总下注: {(parseFloat(team.total_bet_wei) / 10**18).toFixed(6)} ETH</p>
                         <p className="text-sm text-red-200">支持者: {team.supporters}</p>
 
