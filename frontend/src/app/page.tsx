@@ -177,7 +177,7 @@ function BettingSection({ teams, status, teamsLoading }: {
   });
 
   useEffect(() => {
-    if (isSuccess && address && selectedTeam) {
+    if (isSuccess && address && selectedTeam !== null && selectedTeam !== undefined) {
       // 记录用户下注到后端数据库（事件监听器会自动同步链上数据）
       const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5001/api';
       fetch(`${API_BASE_URL}/record_bet`, {
@@ -234,7 +234,7 @@ function BettingSection({ teams, status, teamsLoading }: {
       return;
     }
 
-    if (!selectedTeam) {
+    if (selectedTeam === null || selectedTeam === undefined) {
       alert('请选择战队');
       return;
     }
