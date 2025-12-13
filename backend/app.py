@@ -15,7 +15,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # CORS 配置 - 生产环境允许前端域名，开发环境只允许localhost
-if os.getenv('FLASK_ENV') == 'production':
+if os.getenv('FLASK_ENV') == 'production' or os.getenv('RENDER') or os.getenv('RENDER_EXTERNAL_URL'):
     CORS(app, resources={
         r"/api/*": {
             "origins": ["https://singapore-major-bet-frontend.onrender.com"],
