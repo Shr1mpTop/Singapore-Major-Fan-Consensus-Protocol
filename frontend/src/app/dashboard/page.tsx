@@ -97,6 +97,7 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
   };
 
   const handleBet = () => {
+    alert('handleBet 被调用了！'); // 添加alert确保函数被调用
     console.log('handleBet called');
 
     if (!betAmount || isNaN(parseFloat(betAmount)) || parseFloat(betAmount) <= 0) {
@@ -119,22 +120,46 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
       amount: betAmount,
       amountInWei: amountInWei.toString(),
       contractAddress: CONTRACT_ADDRESS,
-      userAddress: address
+      userAddress: address,
+      expectedChainId: 11155111, // Sepolia
+      betAbi: BET_ABI
     });
 
+    // 检查是否在正确的网络上
+    if (typeof window !== 'undefined' && window.ethereum) {
+      try {
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        console.log('Current chain ID:', chainId);
+        if (chainId !== '0xaa36a7') { // Sepolia chain ID in hex
+          alert('请切换到Sepolia测试网络');
+          return;
+        }
+      } catch (chainError) {
+        console.error('Error checking chain:', chainError);
+      }
+    }
+
     try {
+      console.log('Calling writeContract with params:', {
+        address: CONTRACT_ADDRESS,
+        functionName: 'bet',
+        args: [BigInt(team.id)],
+        value: amountInWei.toString(),
+        gas: '100000'
+      });
+      
       writeContract({
         address: CONTRACT_ADDRESS,
         abi: BET_ABI,
         functionName: 'bet',
         args: [BigInt(team.id)],
         value: amountInWei,
-        gas: BigInt(100000), // 设置 gas limit
+        gas: BigInt(200000), // 增加 gas limit
       });
       console.log('writeContract called successfully');
     } catch (err) {
       console.error('writeContract error:', err);
-      alert('调用合约失败，请检查控制台错误信息');
+      alert(`调用合约失败: ${err instanceof Error ? err.message : '未知错误'}\n请检查控制台获取更多信息`);
     }
   };
 
