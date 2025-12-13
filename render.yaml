@@ -3,7 +3,7 @@ services:
   # Flask 后端服务
   - type: web
     name: singapore-major-bet-backend
-    runtime: python3
+    runtime: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn --config gunicorn.conf.py app:app"
     envVars:
