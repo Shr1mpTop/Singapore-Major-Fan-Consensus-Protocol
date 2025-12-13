@@ -43,7 +43,8 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
   useEffect(() => {
     if (isSuccess && address) {
       // 记录用户下注到后端数据库（事件监听器会自动同步链上数据）
-      fetch('http://localhost:5001/api/record_bet', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5001/api';
+      fetch(`${API_BASE_URL}/record_bet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
