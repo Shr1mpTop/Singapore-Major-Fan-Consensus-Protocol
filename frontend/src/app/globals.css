@@ -8,42 +8,55 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
+    --primary: 0 84% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 20% 95%;
+    --secondary-foreground: 0 84% 60%;
+    --muted: 0 10% 95%;
+    --muted-foreground: 0 20% 45%;
+    --accent: 0 84% 60%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 20% 85%;
+    --input: 0 20% 95%;
+    --ring: 0 84% 60%;
     --radius: 0.5rem;
+
+    /* 红色主题变量 */
+    --red-50: 0 100% 97%;
+    --red-100: 0 93% 94%;
+    --red-200: 0 96% 89%;
+    --red-300: 0 94% 82%;
+    --red-400: 0 91% 60%;
+    --red-500: 0 84% 60%;
+    --red-600: 0 72% 51%;
+    --red-700: 0 74% 42%;
+    --red-800: 0 70% 25%;
+    --red-900: 0 75% 18%;
+    --red-950: 0 67% 10%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --background: 0 67% 10%;
+    --foreground: 0 0% 98%;
+    --card: 0 70% 18%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 70% 18%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 84% 60%;
+    --primary-foreground: 0 67% 15%;
+    --secondary: 0 74% 42%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 74% 42%;
+    --muted-foreground: 0 20% 65%;
+    --accent: 0 84% 60%;
+    --accent-foreground: 0 67% 15%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 74% 42%;
+    --input: 0 74% 42%;
+    --ring: 0 84% 60%;
   }
 
   * {
@@ -52,5 +65,71 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+  }
+}
+
+/* 玻璃效果和发光样式 */
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-red {
+    background: rgba(220, 38, 38, 0.1);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+  }
+
+  .glass-black {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .glow {
+    box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+  }
+
+  .glow-hover:hover {
+    box-shadow: 0 0 30px rgba(220, 38, 38, 0.5);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .btn-pulse {
+    animation: pulse-glow 2s infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(220, 38, 38, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(220, 38, 38, 0.6);
+    }
+  }
+
+  .text-glow {
+    text-shadow: 0 0 10px rgba(220, 38, 38, 0.5);
+  }
+
+  .bg-red-gradient {
+    background: linear-gradient(135deg, hsl(var(--red-950)) 0%, hsl(var(--red-900)) 30%, hsl(var(--red-800)) 70%, hsl(var(--red-700)) 100%);
+  }
+
+  .bg-red-glass {
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.1) 0%, rgba(185, 28, 28, 0.1) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .bg-black-glass {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, rgba(20, 20, 20, 0.5) 50%, rgba(40, 40, 40, 0.3) 100%);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
   }
 }

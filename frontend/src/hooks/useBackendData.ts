@@ -22,12 +22,6 @@ export interface StatsData {
   total_bets: number;
   total_prize_pool_wei: string;
   total_prize_pool_eth: number;
-  team_stats: Array<{
-    team_id: number;
-    team_name: string;
-    total_bets: number;
-    total_amount_eth: number;
-  }>;
 }
 
 export function useStats() {

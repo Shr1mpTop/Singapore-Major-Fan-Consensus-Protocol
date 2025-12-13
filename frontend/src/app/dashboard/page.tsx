@@ -24,7 +24,7 @@ const BET_ABI = [
 ] as const;
 
 // 合约地址
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xb5c4bea741cea63b2151d719b2cca12e80e6c7e8' as `0x${string}`;
+const CONTRACT_ADDRESS: `0x${string}` = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xb5c4bea741cea63b2151d719b2cca12e80e6c7e8') as `0x${string}`;
 
 // 单个队伍的下注卡片组件
 function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; total_bet_wei: string; supporters: number }; totalPool: number }) {
@@ -34,6 +34,7 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
   const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const queryClient = useQueryClient();
   const { address } = useAccount();
+  const { data: status } = useStatus();
   
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
@@ -104,7 +105,7 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
       functionName: 'bet',
       args: [BigInt(team.id)],
       value: amountInWei,
-      gas: 100000n, // 设置 gas limit
+      gas: BigInt(100000), // 设置 gas limit
     });
   };
 
@@ -118,23 +119,23 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
   };
 
   return (
-    <Card className="bg-slate-800 border-slate-700 hover:border-yellow-400 transition-colors">
+    <Card className="glass-red glow-hover border-red-400/30 transition-all duration-300">
       <CardHeader>
-        <CardTitle className="text-yellow-400">{team.name}</CardTitle>
+        <CardTitle className="text-red-300">{team.name}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-slate-400">总下注: {(parseFloat(team.total_bet_wei) / 10**18).toFixed(6)} ETH</p>
-        <p className="text-sm text-slate-400">支持者: {team.supporters}</p>
+        <p className="text-sm text-red-200">总下注: {(parseFloat(team.total_bet_wei) / 10**18).toFixed(6)} ETH</p>
+        <p className="text-sm text-red-200">支持者: {team.supporters}</p>
         <Dialog open={isOpen} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
-            <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700">
+            <Button className="w-full mt-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white glow-hover">
               下注
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-slate-800 border-slate-700 text-white">
+          <DialogContent className="glass-red border-red-400/30 text-white">
             <DialogHeader>
-              <DialogTitle className="text-yellow-400">下注 {team.name}</DialogTitle>
-              <DialogDescription className="text-slate-400">
+              <DialogTitle className="text-red-300">下注 {team.name}</DialogTitle>
+              <DialogDescription className="text-red-200">
                 请输入下注金额并确认交易。队伍ID: {team.id}
               </DialogDescription>
             </DialogHeader>
@@ -148,27 +149,27 @@ function TeamBetCard({ team, totalPool }: { team: { id: number; name: string; to
                   value={betAmount}
                   onChange={(e) => setBetAmount(e.target.value)}
                   placeholder="0.01"
-                  className="bg-slate-700 border-slate-600 text-white"
+                  className="bg-red-900/50 border-red-400/50 text-white placeholder-red-300"
                 />
               </div>
               {betAmount && parseFloat(betAmount) > 0 && (
-                <div className="p-4 bg-slate-700 rounded">
-                  <p className="text-sm text-white">预计收益: {calculateOdds().toFixed(6)} ETH</p>
+                <div className="p-4 bg-red-900/30 rounded border border-red-400/30">
+                  <p className="text-sm text-red-100">预计收益: {calculateOdds().toFixed(6)} ETH</p>
                 </div>
               )}
               {error && (
-                <div className="p-4 bg-red-900 rounded">
+                <div className="p-4 bg-red-900/50 rounded border border-red-500/50">
                   <p className="text-sm text-red-300">错误: {error.message}</p>
                 </div>
               )}
               {isSuccess && (
-                <div className="p-4 bg-green-900 rounded">
+                <div className="p-4 bg-green-900/30 rounded border border-green-400/50">
                   <p className="text-sm text-green-300">✅ 交易成功！</p>
                   <p className="text-xs text-green-400 break-all">交易哈希: {hash}</p>
                 </div>
               )}
-              <Button 
-                className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold" 
+              <Button
+                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold glow-hover border border-red-400/50"
                 onClick={handleBet}
                 disabled={isPending || isConfirming || !betAmount || parseFloat(betAmount) <= 0}
               >
@@ -208,9 +209,16 @@ export default function Dashboard() {
   // 检查钱包连接
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl mb-4 text-white">请先连接钱包</h1>
+      <div className="min-h-screen bg-red-gradient flex items-center justify-center relative">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
+          style={{
+            backgroundImage: "url('/bg.png')",
+          }}
+        />
+        <div className="absolute inset-0 bg-black-glass" />
+        <div className="text-center glass-red rounded-2xl p-8 glow relative z-10">
+          <h1 className="text-2xl mb-4 text-red-100">请先连接钱包</h1>
           <ConnectButton />
         </div>
       </div>
@@ -220,12 +228,19 @@ export default function Dashboard() {
   // 检查游戏状态
   if (status && status.status !== 0) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center text-white">
-          <h1 className="text-2xl mb-4">投注已关闭</h1>
-          <p className="text-slate-400">当前状态：{status.status_text}</p>
+      <div className="min-h-screen bg-red-gradient flex items-center justify-center relative">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
+          style={{
+            backgroundImage: "url('/bg.png')",
+          }}
+        />
+        <div className="absolute inset-0 bg-black-glass" />
+        <div className="text-center glass-red rounded-2xl p-8 glow relative z-10">
+          <h1 className="text-2xl mb-4 text-red-100">投注已关闭</h1>
+          <p className="text-red-200">当前状态：{status.status_text}</p>
           {status.winning_team_id !== null && status.winning_team_id !== 0 && (
-            <p className="text-yellow-400 mt-2">获胜队伍ID: {status.winning_team_id}</p>
+            <p className="text-red-300 mt-2">获胜队伍ID: {status.winning_team_id}</p>
           )}
         </div>
       </div>
@@ -233,19 +248,28 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white">
-      <header className="p-4 border-b border-slate-700">
+    <div className="min-h-screen bg-red-gradient text-white relative">
+      {/* 背景图片 */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
+        style={{
+          backgroundImage: "url('/bg.png')",
+        }}
+      />
+      <div className="absolute inset-0 bg-black-glass" />
+
+      <header className="p-4 border-b border-red-400/30 relative z-10">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold">CS2 Major Betting</h1>
+          <h1 className="text-xl font-bold text-glow">CS2 Major Betting</h1>
           <ConnectButton />
         </div>
       </header>
 
-      <main className="p-4">
+      <main className="p-4 relative z-10">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold mb-2">选择战队下注</h2>
-            <p className="text-slate-400">当前总奖池: {totalPool.toFixed(6)} ETH</p>
+          <div className="text-center mb-8 glass-red rounded-xl p-6 glow">
+            <h2 className="text-2xl font-bold mb-2 text-red-100">选择战队下注</h2>
+            <p className="text-red-200">当前总奖池: {totalPool.toFixed(6)} ETH</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {teamsLoading ? (
