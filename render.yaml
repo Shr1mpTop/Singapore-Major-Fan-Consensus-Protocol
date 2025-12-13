@@ -1,4 +1,4 @@
-# Render.com 部署配置
+# Render.com 后端服务配置
 services:
   # Flask 后端服务
   - type: web
@@ -11,19 +11,3 @@ services:
         value: production
       - key: PYTHON_VERSION
         value: 3.11.0
-
-  # Next.js 前端服务
-  - type: web
-    name: singapore-major-bet-frontend
-    runtime: node
-    buildCommand: "npm install && npm run build"
-    startCommand: "npm start"
-    envVars:
-      - key: NODE_ENV
-        value: production
-
-# 数据库 (如果需要PostgreSQL)
-# databases:
-#   - name: betting-db
-#     databaseName: betting_db
-#     user: betting_user
