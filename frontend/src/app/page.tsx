@@ -27,6 +27,8 @@ const BET_ABI = [
 
 // 合约地址
 const CONTRACT_ADDRESS: `0x${string}` = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xb5c4bea741cea63b2151d719b2cca12e80e6c7e8') as `0x${string}`;
+
+function HeroSection({ onScrollToBetting }: { onScrollToBetting: () => void }) {
   return (
     <motion.section
       className="min-h-screen flex items-center justify-center px-4 relative"
