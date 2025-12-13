@@ -176,11 +176,7 @@ function BettingSection({ teams, status, teamsLoading }: {
     hash,
   });
 
-  // 调试信息
-  console.log('BettingSection render:', { selectedTeam, address, isPending, isConfirming, isSuccess });
-
   useEffect(() => {
-    console.log('BettingSection useEffect triggered:', { isSuccess, address, hash });
     if (isSuccess && address && selectedTeam) {
       // 记录用户下注到后端数据库（事件监听器会自动同步链上数据）
       const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:5001/api';
@@ -199,11 +195,13 @@ function BettingSection({ teams, status, teamsLoading }: {
         }
         return response.json();
       })
-      .then(data => console.log('Bet recorded:', data))
-      .catch((error) => {
-        console.error('Record bet error:', error);
-        alert('记录下注失败，请检查后端。');
-      });
+      .then(data => {
+        // 记录成功，关闭弹窗
+        setIsOpen(false);
+        setBetAmount('');
+        setSelectedTeam(null);
+        reset();
+      })
       
       // 关闭弹窗
       setIsOpen(false);
@@ -226,17 +224,12 @@ function BettingSection({ teams, status, teamsLoading }: {
   };
 
   const handleBet = async () => {
-    alert('handleBet 被调用了！'); // 添加alert确保函数被调用
-    console.log('handleBet called');
-
     if (!betAmount || isNaN(parseFloat(betAmount)) || parseFloat(betAmount) <= 0) {
-      console.log('Invalid bet amount:', betAmount);
       alert('请输入有效的下注金额（大于0的数字）');
       return;
     }
 
     if (!address) {
-      console.log('No wallet address');
       alert('请先连接钱包');
       return;
     }
@@ -247,23 +240,11 @@ function BettingSection({ teams, status, teamsLoading }: {
     }
 
     const amountInWei = parseEther(betAmount);
-    
-    console.log('准备下注:', {
-      teamId: selectedTeam,
-      teamName: teams.find(t => t.id === selectedTeam)?.name,
-      amount: betAmount,
-      amountInWei: amountInWei.toString(),
-      contractAddress: CONTRACT_ADDRESS,
-      userAddress: address,
-      expectedChainId: 11155111, // Sepolia
-      betAbi: BET_ABI
-    });
 
     // 检查是否在正确的网络上
     if (typeof window !== 'undefined' && window.ethereum) {
       try {
         const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-        console.log('Current chain ID:', chainId);
         if (chainId !== '0xaa36a7') { // Sepolia chain ID in hex
           alert('请切换到Sepolia测试网络');
           return;
@@ -274,14 +255,6 @@ function BettingSection({ teams, status, teamsLoading }: {
     }
 
     try {
-      console.log('Calling writeContract with params:', {
-        address: CONTRACT_ADDRESS,
-        functionName: 'bet',
-        args: [BigInt(selectedTeam)],
-        value: amountInWei.toString(),
-        gas: '200000'
-      });
-      
       writeContract({
         address: CONTRACT_ADDRESS,
         abi: BET_ABI,
@@ -290,7 +263,6 @@ function BettingSection({ teams, status, teamsLoading }: {
         value: amountInWei,
         gas: BigInt(200000), // 增加 gas limit
       });
-      console.log('writeContract called successfully');
     } catch (err) {
       console.error('writeContract error:', err);
       alert(`调用合约失败: ${err instanceof Error ? err.message : '未知错误'}\n请检查控制台获取更多信息`);
@@ -379,15 +351,7 @@ function BettingSection({ teams, status, teamsLoading }: {
                         
                         <p className="text-sm text-red-200">总下注: {(parseFloat(team.total_bet_wei) / 10**18).toFixed(6)} ETH</p>
                         <p className="text-sm text-red-200">支持者: {team.supporters}</p>
-                        
-                        {/* 测试按钮 */}
-                        <Button 
-                          className="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm"
-                          onClick={() => alert('🎉 测试按钮被点击了！时间: ' + new Date().toLocaleString())}
-                        >
-                          🧪 测试按钮
-                        </Button>
-                        
+
                         <Dialog open={isOpen && selectedTeam === team.id} onOpenChange={(open) => {
                           if (open) {
                             setSelectedTeam(team.id);
