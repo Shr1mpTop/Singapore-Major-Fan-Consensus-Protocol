@@ -24,7 +24,13 @@ export interface StatsData {
   total_bets: number;
   total_prize_pool_wei: string;
   total_prize_pool_eth: number;
-  weapon_equivalents: { name: string; count: number; img: string }[];
+  weapon_equivalents: { 
+    name: string; 
+    count: number; 
+    img: string;
+    price_usd: number;
+    progress: number;
+  }[];
 }
 
 export interface LeaderboardData {

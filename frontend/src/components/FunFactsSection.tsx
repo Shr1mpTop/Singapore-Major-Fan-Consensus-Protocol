@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import { useMemo } from "react";
+import { Progress } from "@/components/ui/progress"; // Import the new Progress component
 
 // Helper to format wallet addresses (e.g., 0x1234...5678)
 const formatAddress = (address: string) => {
@@ -22,12 +23,16 @@ export function FunFactsSection() {
   const { data: stats, isLoading: statsLoading } = useStats();
   const { data: leaderboard, isLoading: leaderboardLoading } = useLeaderboard();
 
-  // Memoize the selected weapon to prevent re-calculation on every render
   const prizeWeapon = useMemo(() => {
     if (!stats?.weapon_equivalents || stats.weapon_equivalents.length === 0) {
-      return { name: "AWP | Dragon Lore", count: 0, img: "/skins/dragon_lore.png" };
+      return { 
+        name: "AWP | Dragon Lore", 
+        count: 0, 
+        img: "/Dragon Lore (AWP).webp", // Corrected the fallback image path
+        progress: 0,
+        price_usd: 4000
+      };
     }
-    // Select the most expensive weapon the prize pool can afford for max impact
     return stats.weapon_equivalents[0];
   }, [stats?.weapon_equivalents]);
   
@@ -64,12 +69,71 @@ export function FunFactsSection() {
           ></motion.div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-          {/* Leaderboard Card */}
+        <div className="grid grid-cols-1 gap-12 items-start max-w-4xl mx-auto">
+          
+          {/* Prize Pool Power Card - NOW ON TOP */}
           <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.3 }}
+            viewport={{ once: true }}
+          >
+             <Card className="glass-black p-6 lg:p-8 rounded-2xl border-2 border-red-500/30 h-full">
+               <CardHeader className="text-center p-0 mb-6">
+                <CardTitle className="text-3xl font-bold text-red-100 tracking-wider">
+                  Prize Pool Power
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 text-center">
+                {statsLoading ? (
+                  <div className="flex flex-col items-center">
+                    <Skeleton className="h-24 w-48 bg-red-900/50 rounded-lg mb-4" />
+                    <Skeleton className="h-8 w-3/4 bg-red-900/50 rounded-md" />
+                    <Skeleton className="h-4 w-1/2 bg-red-900/50 rounded-md mt-4" />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full">
+                    <p className="text-xl text-red-200 mb-4">The current prize pool could buy</p>
+                    <motion.div 
+                      className="text-6xl font-black text-yellow-300 drop-shadow-lg mb-4"
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 100, damping: 10, delay: 0.2 }}
+                    >
+                      {prizeWeapon.count.toLocaleString()}
+                    </motion.div>
+                    <p className="text-2xl font-bold text-red-100 mb-4">{prizeWeapon.name}(s)</p>
+                    <motion.img 
+                      src={prizeWeapon.img} 
+                      alt={prizeWeapon.name} 
+                      className="w-48 h-auto object-contain drop-shadow-lg mb-8"
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ duration: 0.8, delay: 0.4 }}
+                    />
+                    
+                    {/* Progress Bar Section */}
+                    <div className="w-full max-w-md">
+                      <div className="flex justify-between items-center mb-2 text-red-200">
+                        <span>Progress to next one</span>
+                        <span className="font-semibold text-yellow-300">{prizeWeapon.progress.toFixed(2)}%</span>
+                      </div>
+                      <Progress value={prizeWeapon.progress} />
+                      <p className="text-sm text-red-400 mt-2">
+                        Current Value: ${prizeWeapon.price_usd.toFixed(2)} USD
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Leaderboard Card - NOW AT THE BOTTOM */}
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
             viewport={{ once: true }}
           >
             <Card className="glass-black p-6 lg:p-8 rounded-2xl border-2 border-red-500/30 h-full">
@@ -110,50 +174,6 @@ export function FunFactsSection() {
             </Card>
           </motion.div>
 
-          {/* Prize Pool Power Card */}
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            viewport={{ once: true }}
-          >
-             <Card className="glass-black p-6 lg:p-8 rounded-2xl border-2 border-red-500/30 h-full">
-               <CardHeader className="text-center p-0 mb-6">
-                <CardTitle className="text-3xl font-bold text-red-100 tracking-wider">
-                  Prize Pool Power
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0 text-center">
-                {statsLoading ? (
-                  <div className="flex flex-col items-center">
-                    <Skeleton className="h-24 w-48 bg-red-900/50 rounded-lg mb-4" />
-                    <Skeleton className="h-8 w-3/4 bg-red-900/50 rounded-md" />
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full">
-                    <p className="text-xl text-red-200 mb-4">The current prize pool could buy</p>
-                    <motion.div 
-                      className="text-6xl font-black text-yellow-300 drop-shadow-lg mb-4"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: "spring", stiffness: 100, damping: 10, delay: 0.2 }}
-                    >
-                      {prizeWeapon.count.toLocaleString()}
-                    </motion.div>
-                    <p className="text-2xl font-bold text-red-100 mb-4">{prizeWeapon.name}(s)</p>
-                    <motion.img 
-                      src={prizeWeapon.img} 
-                      alt={prizeWeapon.name} 
-                      className="w-48 h-auto object-contain drop-shadow-lg"
-                      initial={{ y: 20, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ duration: 0.8, delay: 0.4 }}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
         </div>
       </div>
     </motion.section>
