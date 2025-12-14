@@ -9,6 +9,7 @@ import threading
 import time
 import requests
 from datetime import datetime
+from sqlalchemy import func, cast, Numeric
 
 # 1. 初始化配置
 load_dotenv()
@@ -68,8 +69,17 @@ if not etherscan_api_key:
 # Etherscan API URLs
 ETHERSCAN_BASE_URL = "https://api.etherscan.io/v2/api"  # V2 API for all networks
 
-# 目标方法ID：bet(uint256 _teamId)
+# 目标方法ID：bet(uint265 _teamId)
 TARGET_METHOD_ID = "0x7365870b"
+
+# Pre-defined list of popular CS2 weapon skins and their approximate USD prices
+WEAPON_SKINS = [
+    {"name": "Dragon Lore (AWP)", "price": 4000, "img": "/skins/dragon_lore.png"},
+    {"name": "Karambit | Case Hardened (Blue Gem)", "price": 100000, "img": "/skins/karambit_blue_gem.png"},
+    {"name": "Howl (M4A4)", "price": 3000, "img": "/skins/howl.png"},
+    {"name": "AK-47 | Fire Serpent", "price": 1500, "img": "/skins/fire_serpent.png"},
+    {"name": "Gungnir (AWP)", "price": 8000, "img": "/skins/gungnir.png"},
+]
 
 # --- 2. 数据库模型 (Models) ---
 
@@ -483,13 +493,84 @@ def get_stats():
     # 计算总奖金池（从GameState获取）
     game_state = GameState.query.first()
     total_prize_pool_wei = game_state.total_prize_pool if game_state else "0"
+    total_prize_pool_eth = float(web3.from_wei(int(total_prize_pool_wei), 'ether'))
     
+    # Calculate weapon equivalents
+    weapon_equivalents = []
+    try:
+        eth_price_response = requests.get('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT')
+        eth_price_usd = float(eth_price_response.json()['price'])
+        total_prize_pool_usd = total_prize_pool_eth * eth_price_usd
+        
+        for weapon in WEAPON_SKINS:
+            if total_prize_pool_usd > weapon['price']:
+                count = int(total_prize_pool_usd / weapon['price'])
+                weapon_equivalents.append({
+                    "name": weapon['name'],
+                    "count": count,
+                    "img": weapon['img']
+                })
+    except Exception as e:
+        print(f"Could not calculate weapon equivalents: {e}")
+        # Intentionally left empty on failure
+
     return jsonify({
         "total_unique_participants": total_unique_participants,
         "total_bets": total_bets,
         "total_prize_pool_wei": total_prize_pool_wei,
-        "total_prize_pool_eth": float(web3.from_wei(int(total_prize_pool_wei), 'ether'))
+        "total_prize_pool_eth": total_prize_pool_eth,
+        "weapon_equivalents": weapon_equivalents
     })
+    
+@app.route('/api/leaderboard', methods=['GET'])
+def get_leaderboard():
+    """获取下注排行榜"""
+    try:
+        # Cast amount_wei from String to Numeric for safe summation
+        top_bettors = db.session.query(
+            UserBet.user_address,
+            func.sum(cast(UserBet.amount_wei, Numeric)).label('total_amount_wei')
+        ).group_by(UserBet.user_address).order_by(func.sum(cast(UserBet.amount_wei, Numeric)).desc()).limit(5).all()
+        
+        leaderboard = []
+        for rank, bettor in enumerate(top_bettors, 1):
+            # Ensure total_amount_wei is not None before processing
+            total_wei = bettor.total_amount_wei or 0
+            leaderboard.append({
+                "rank": rank,
+                "address": bettor.user_address,
+                "total_bet_eth": float(web3.from_wei(int(total_wei), 'ether'))
+            })
+            
+        return jsonify(leaderboard)
+    except Exception as e:
+        print(f"❌ Error in /api/leaderboard: {e}") # Added logging
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# Path to the directory where logos are stored, relative to the backend app.py file
+LOGO_DIR_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'public', 'teams'))
+
+def get_logo_url(team_name):
+    """Find the logo URL for a team by its name, checking for webp, svg, and png."""
+    # Sanitize the team name to create a filename (e.g., "Team Spirit" -> "spirit")
+    # This is a simple example; you might need more robust logic
+    filename = team_name.lower().split(" ")[-1]
+
+    for ext in ['webp', 'svg', 'png']:
+        if os.path.exists(os.path.join(LOGO_DIR_PATH, f"{filename}.{ext}")):
+            return f"/teams/{filename}.{ext}"
+    
+    # Fallback for names that might not match the simple split logic
+    # (e.g., G2 Esports -> g2)
+    if os.path.exists(os.path.join(LOGO_DIR_PATH, f"{team_name.lower().replace(' esports', '')}.webp")):
+        return f"/teams/{team_name.lower().replace(' esports', '')}.webp"
+    if os.path.exists(os.path.join(LOGO_DIR_PATH, f"{team_name.lower().replace(' esports', '')}.svg")):
+        return f"/teams/{team_name.lower().replace(' esports', '')}.svg"
+
+    # Default if no specific logo is found
+    return "/teams/default.png"
 
 @app.route('/api/teams', methods=['GET'])
 def get_teams():
@@ -501,10 +582,19 @@ def get_teams():
         result.append({
             "id": t.id,
             "name": t.name,
-            "total_bet_wei": t.total_bet_amount,
-            "total_bet_eth": float(web3.from_wei(int(t.total_bet_amount), 'ether')),
-            "supporters": t.supporter_count
+            "logo_url": get_logo_url(t.name), # Pass team name instead of ID
+            "prize_pool_eth": float(web3.from_wei(int(t.total_bet_amount), 'ether')),
+            "bets_count": t.supporter_count,
+            "is_winner": False # Placeholder, will be updated based on GameState
         })
+    
+    # Check for a winner and update the is_winner flag
+    game_state = GameState.query.first()
+    if game_state and game_state.winning_team_id:
+        for team in result:
+            if team['id'] == game_state.winning_team_id:
+                team['is_winner'] = True
+                break
     
     return jsonify(result)
 

@@ -14,6 +14,7 @@ import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatedNumber, SlotMachineNumber } from "@/components/AnimatedNumber";
+import { FunFactsSection } from "@/components/FunFactsSection"; // Import the new component
 
 // Contract ABI - bet function
 const BET_ABI = [
@@ -472,7 +473,7 @@ function BettingSection({ teams, status, teamsLoading }: {
   status: any;
   teamsLoading: boolean;
 }) {
-  const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
   const [betAmount, setBetAmount] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const { address, isConnected } = useAccount();
@@ -492,239 +493,275 @@ function BettingSection({ teams, status, teamsLoading }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userAddress: address,
-          teamId: selectedTeam,
+          teamId: selectedTeam.id,
           amount: (parseEther(betAmount)).toString(),  // Wei string
         }),
       })
       .then(response => {
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          console.error("Failed to record bet to backend");
         }
-        return response.json();
+        // Invalidate queries to refetch data after a successful bet
+        queryClient.invalidateQueries({ queryKey: ['teams'] });
+        queryClient.invalidateQueries({ queryKey: ['stats'] });
+        queryClient.invalidateQueries({ queryKey: ['status'] });
       })
-      .then(data => {
-        // Record successful, close dialog
-        setIsOpen(false);
-        setBetAmount('');
-        setSelectedTeam(null);
-        reset();
-      })
-      
-      // Close dialog
-      setIsOpen(false);
-      setBetAmount('');
-      setSelectedTeam(null);
-      reset();
+      .catch(error => console.error("Error recording bet:", error));
     }
-  }, [isSuccess, address, selectedTeam, betAmount, queryClient, reset]);
+  }, [isSuccess, address, selectedTeam, betAmount, queryClient]);
 
-  const calculateOdds = () => {
-    const userAmount = parseFloat(betAmount) || 0;
-    const selectedTeamData = teams.find(t => t.id === selectedTeam);
-    if (!selectedTeamData) return 0;
-    
-    const teamPool = parseFloat(selectedTeamData.total_bet_wei) / 10**18;
-    const totalPoolAmount = parseFloat(status?.total_prize_pool_wei || '0') / 10**18;
-    const finalPool = totalPoolAmount * 0.9;
-    if (teamPool === 0) return 0;
-    return (userAmount / teamPool) * finalPool;
-  };
-
-  const handleBet = async () => {
-    if (!betAmount || isNaN(parseFloat(betAmount)) || parseFloat(betAmount) <= 0) {
-      alert('Please enter a valid bet amount (greater than 0)');
-      return;
-    }
-
-    if (!address) {
-      alert('Please connect your wallet first');
-      return;
-    }
-
-    if (selectedTeam === null || selectedTeam === undefined) {
-      alert('Please select a team');
-      return;
-    }
-
-    const amountInWei = parseEther(betAmount);
-
-    // Check if on correct network
-    if (typeof window !== 'undefined' && window.ethereum) {
-      try {
-        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-        if (chainId !== '0xaa36a7') { // Sepolia chain ID in hex
-          alert('Please switch to Sepolia testnet');
-          return;
-        }
-      } catch (chainError) {
-        console.error('Error checking chain:', chainError);
-      }
-    }
-
-    try {
+  const handleBet = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedTeam && betAmount) {
       writeContract({
         address: CONTRACT_ADDRESS,
         abi: BET_ABI,
         functionName: 'bet',
-        args: [BigInt(selectedTeam)],
-        value: amountInWei,
-        gas: BigInt(200000), // Increase gas limit
+        args: [BigInt(selectedTeam.id)],
+        value: parseEther(betAmount),
       });
-    } catch (err) {
-      console.error('writeContract error:', err);
-      alert(`Contract call failed: ${err instanceof Error ? err.message : 'Unknown error'}\nPlease check console for more details`);
     }
   };
 
-  const handleOpenChange = (open: boolean) => {
-    setIsOpen(open);
-    if (!open && !isSuccess) {
-      // Reset state on close, if not successful close
-      setBetAmount('');
-      setSelectedTeam(null);
-      reset();
-    }
+  const handleOpenDialog = (team: any) => {
+    setSelectedTeam(team);
+    setBetAmount('');
+    reset();
+    setIsOpen(true);
   };
+
+  const handleCloseDialog = () => {
+    setIsOpen(false);
+  }
+
+  // Find the winning team
+  const winningTeam = teams.find(team => team.is_winner);
 
   return (
     <motion.section
-      className="min-h-screen py-16 px-4 relative z-10"
+      id="betting-section"
+      className="py-24 px-4 relative z-10"
       initial={{ opacity: 0 }}
       whileInView={{ opacity: 1 }}
-      transition={{ duration: 1 }}
+      transition={{ duration: 1, delay: 0.2 }}
       viewport={{ once: true }}
     >
-      {/* Betting section overlay - very subtle for natural flow */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-yellow-900/3 to-transparent"></div>
-
-      <div className="max-w-6xl mx-auto relative">
-        <motion.h2
-          className="text-3xl font-bold text-center mb-12 text-glow"
-          initial={{ opacity: 0, y: -30 }}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-red-900/10 to-transparent"></div>
+      
+      <div className="max-w-7xl mx-auto relative">
+        {/* Section Title */}
+        <motion.div
+          className="text-center mb-20"
+          initial={{ opacity: 0, y: -50 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          viewport={{ once: true }}
         >
-          Select Team to Bet
-        </motion.h2>
-
-        {!isConnected ? (
+          <h2 className="text-6xl md:text-8xl font-black bg-gradient-to-r from-red-400 via-red-300 to-yellow-400 bg-clip-text text-transparent text-glow tracking-wider mb-4">
+            Place Your Bet
+          </h2>
+          <p className="text-xl text-red-200 max-w-2xl mx-auto">
+            Select a team to see their stats and place your bet. The prize pool is distributed to the winners.
+          </p>
           <motion.div
-            className="text-center glass-red rounded-xl p-8 glow"
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6 }}
-          >
-            <h3 className="text-xl mb-4 text-red-100">Please connect your wallet first</h3>
-            <ConnectButton />
-          </motion.div>
-        ) : (
-          <>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {teamsLoading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 50 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: i * 0.1 }}
-                  >
-                    <Card className="bg-slate-800 border-slate-700">
-                      <CardHeader>
-                        <Skeleton className="h-6 w-20" />
-                      </CardHeader>
-                      <CardContent>
-                        <Skeleton className="h-4 w-16 mb-2" />
-                        <Skeleton className="h-4 w-12" />
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))
-              ) : (
-                teams?.map((team, index) => (
-                  <motion.div
-                    key={team.id}
-                    initial={{ opacity: 0, y: 50 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Card className="glass-red glow-hover border-red-400/30 transition-all duration-300">
-                      <CardHeader>
-                        <CardTitle className="text-red-300">{team.name}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-red-200">Total Bets: {(parseFloat(team.total_bet_wei) / 10**18).toFixed(6)} ETH</p>
-                        <p className="text-sm text-red-200">Supporters: {team.supporters}</p>
+            className="w-40 h-2 bg-gradient-to-r from-red-500 to-yellow-500 mx-auto rounded-full mt-6"
+            initial={{ scaleX: 0 }}
+            whileInView={{ scaleX: 1 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            viewport={{ once: true }}
+          ></motion.div>
+        </motion.div>
 
-                        <Dialog open={isOpen && selectedTeam === team.id} onOpenChange={(open) => {
-                          if (open) {
-                            setSelectedTeam(team.id);
-                          }
-                          handleOpenChange(open);
-                        }}>
-                          <DialogTrigger asChild>
-                            <Button className="w-full mt-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white glow-hover">
-                              Bet
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="glass-red border-red-400/30 text-white">
-                            <DialogHeader>
-                              <DialogTitle className="text-red-300">Bet on {team.name}</DialogTitle>
-                              <DialogDescription className="text-red-200">
-                                Please enter your bet amount and confirm the transaction. Team ID: {team.id}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <label className="block text-sm mb-2 text-white">Bet Amount (ETH)</label>
-                                <Input
-                                  type="number"
-                                  step="0.001"
-                                  min="0"
-                                  value={betAmount}
-                                  onChange={(e) => setBetAmount(e.target.value)}
-                                  placeholder="0.01"
-                                  className="bg-red-900/50 border-red-400/50 text-white placeholder-red-300"
-                                />
-                              </div>
-                              {betAmount && parseFloat(betAmount) > 0 && (
-                                <div className="p-4 bg-red-900/30 rounded border border-red-400/30">
-                                  <p className="text-sm text-red-100">Expected Payout: {calculateOdds().toFixed(6)} ETH</p>
-                                </div>
-                              )}
-                              {error && (
-                                <div className="p-4 bg-red-900/50 rounded border border-red-500/50">
-                                  <p className="text-sm text-red-300">Error: {error.message}</p>
-                                </div>
-                              )}
-                              {isSuccess && (
-                                <div className="p-4 bg-green-900/30 rounded border border-green-400/50">
-                                  <p className="text-sm text-green-300">✅ Transaction Successful!</p>
-                                  <p className="text-xs text-green-400 break-all">Transaction Hash: {hash}</p>
-                                </div>
-                              )}
-                              <Button
-                                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold glow-hover border border-red-400/50"
-                                onClick={handleBet}
-                                disabled={isPending || isConfirming || !betAmount || parseFloat(betAmount) <= 0}
-                              >
-                                {isPending ? 'Confirm in wallet...' : isConfirming ? 'Processing transaction...' : `Confirm bet ${betAmount || '0'} ETH`}
-                              </Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))
+        {/* Teams Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {teamsLoading ? (
+            [...Array(8)].map((_, i) => (
+              <Card key={i} className="glass-red p-4 rounded-xl">
+                <Skeleton className="h-32 w-full bg-red-900/50 rounded-lg mb-4" />
+                <Skeleton className="h-6 w-3/4 bg-red-900/50 rounded-md mb-2" />
+                <Skeleton className="h-4 w-1/2 bg-red-900/50 rounded-md" />
+              </Card>
+            ))
+          ) : (
+            teams.map(team => (
+              <motion.div
+                key={team.id}
+                initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                whileHover={{ scale: 1.05, transition: { duration: 0.3 } }}
+                transition={{ duration: 0.5 }}
+                viewport={{ once: true }}
+                className={`relative rounded-2xl overflow-hidden group transform transition-all duration-300 ${
+                  winningTeam ? (winningTeam.id === team.id ? 'shadow-2xl shadow-yellow-400/50 border-2 border-yellow-400' : 'opacity-50 grayscale') : ''
+                }`}
+              >
+                <Card 
+                  className="glass-black p-6 rounded-2xl h-full flex flex-col items-center text-center cursor-pointer border-2 border-transparent group-hover:border-red-500 transition-colors duration-300"
+                  onClick={() => handleOpenDialog(team)}
+                >
+                  {/* Winner Badge */}
+                  {winningTeam && winningTeam.id === team.id && (
+                    <motion.div
+                      className="absolute top-3 right-3 bg-yellow-400 text-gray-900 font-bold px-4 py-1 rounded-full text-sm shadow-lg"
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: 'spring', damping: 10, stiffness: 150, delay: 0.5 }}
+                    >
+                      WINNER
+                    </motion.div>
+                  )}
+                  <CardHeader className="p-0 mb-4">
+                    <motion.img 
+                      src={team.logo_url} 
+                      alt={team.name} 
+                      className="w-24 h-24 mx-auto object-contain drop-shadow-lg"
+                      whileHover={{ rotate: [0, -10, 10, 0], transition: { duration: 0.5 } }}
+                    />
+                  </CardHeader>
+                  <CardContent className="p-0 flex flex-col flex-grow justify-center">
+                    <CardTitle className="text-2xl font-bold text-red-100 mb-2">{team.name}</CardTitle>
+                    <p className="text-red-300">
+                      Prize Pool: <span className="font-semibold text-yellow-300">{(team.prize_pool_eth ?? 0).toFixed(4)} ETH</span>
+                    </p>
+                    <p className="text-sm text-red-400 mt-1">
+                      {team.bets_count} Bets
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Betting Dialog */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="glass-red text-white border-red-500/50">
+          <DialogHeader>
+            {selectedTeam && (
+              <div className="flex items-center space-x-4 mb-4">
+                <img src={selectedTeam.logo_url} alt={selectedTeam.name} className="w-16 h-16 object-contain" />
+                <div>
+                  <DialogTitle className="text-3xl font-bold text-red-100">Bet on {selectedTeam.name}</DialogTitle>
+                  <DialogDescription className="text-red-300">
+                    Your bet will be added to this team's prize pool.
+                  </DialogDescription>
+                </div>
+              </div>
+            )}
+          </DialogHeader>
+          
+          {!isSuccess && !isConfirming && !isPending && (
+            <form onSubmit={handleBet} className="space-y-6">
+              <div>
+                <label htmlFor="betAmount" className="block text-sm font-medium text-red-200 mb-2">
+                  Bet Amount (ETH)
+                </label>
+                <Input
+                  id="betAmount"
+                  type="number"
+                  step="0.001"
+                  min="0.001"
+                  value={betAmount}
+                  onChange={(e) => setBetAmount(e.target.value)}
+                  className="bg-red-900/50 border-red-500/50 text-white placeholder-red-400 focus:ring-red-400"
+                  placeholder="e.g., 0.01"
+                  required
+                />
+              </div>
+
+              {isConnected ? (
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 text-lg glow-hover border border-red-400/50"
+                  disabled={isPending || !betAmount}
+                >
+                  {isPending ? 'Waiting for wallet...' : `Place Bet`}
+                </Button>
+              ) : (
+                <div className="text-center p-4 bg-red-900/50 rounded-lg">
+                  <p className="font-semibold text-yellow-300">Please connect your wallet to bet.</p>
+                </div>
+              )}
+              {error && (
+                <div className="text-red-400 text-sm mt-2 text-center break-words">
+                  <p>Error: {error.message.split('(')[0]}</p>
+                </div>
+              )}
+            </form>
+          )}
+
+          {(isConfirming || isPending) && (
+            <div className="flex flex-col items-center justify-center space-y-4 p-8">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-16 h-16 border-4 border-t-red-400 border-red-800 rounded-full"
+              />
+              <p className="text-xl font-semibold text-red-200">
+                {isPending ? 'Waiting for signature...' : 'Processing transaction...'}
+              </p>
+              <p className="text-red-300 text-sm text-center">Your transaction is being confirmed on the blockchain. This may take a moment.</p>
+              {hash && (
+                <a href={`https://sepolia.etherscan.io/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="text-sm text-yellow-300 hover:text-yellow-200 underline mt-2">
+                  View on Etherscan
+                </a>
               )}
             </div>
-          </>
-        )}
-      </div>
+          )}
+
+          {isSuccess && (
+            <div className="flex flex-col items-center justify-center space-y-4 p-8 text-center">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', damping: 10, stiffness: 150 }}
+                className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center"
+              >
+                <svg className="w-12 h-12 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </motion.div>
+              <p className="text-2xl font-bold text-green-300">Bet Placed Successfully!</p>
+              <p className="text-red-200">
+                You have successfully bet <span className="font-bold text-yellow-300">{betAmount} ETH</span> on <span className="font-bold text-yellow-300">{selectedTeam?.name}</span>.
+              </p>
+              {hash && (
+                 <a href={`https://sepolia.etherscan.io/tx/${hash}`} target="_blank" rel="noopener noreferrer" className="text-sm text-yellow-300 hover:text-yellow-200 underline mt-2">
+                   View on Etherscan
+                 </a>
+              )}
+              <Button onClick={handleCloseDialog} className="mt-6 bg-red-600 hover:bg-red-700">Close</Button>
+            </div>
+          )}
+
+        </DialogContent>
+      </Dialog>
     </motion.section>
   );
+}
+
+function MainContent() {
+  const { data: teams, isLoading: teamsLoading } = useTeams();
+  const { data: status, isLoading: statusLoading } = useStatus();
+  const { data: stats, isLoading: statsLoading } = useStats();
+
+  const bettingSectionRef = useRef<HTMLElement>(null);
+
+  const handleScrollToBetting = () => {
+    bettingSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  return (
+    <>
+      <HeroSection onScrollToBetting={handleScrollToBetting} />
+      <StatsSection stats={stats} status={status} statsLoading={statsLoading} statusLoading={statusLoading} />
+      <div ref={bettingSectionRef}>
+        <BettingSection teams={teams || []} status={status} teamsLoading={teamsLoading} />
+      </div>
+      <FunFactsSection /> {/* Add the new component here */}
+    </>
+  )
 }
 
 export default function Home() {
@@ -853,6 +890,7 @@ export default function Home() {
             teamsLoading={teamsLoading}
           />
         </div>
+        <FunFactsSection /> {/* Add the new component here */}
       </div>
 
       {/* 页面指示器 */}

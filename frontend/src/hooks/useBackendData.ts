@@ -13,8 +13,10 @@ export interface StatusData {
 export interface TeamData {
   id: number;
   name: string;
-  total_bet_wei: string;
-  supporters: number;
+  logo_url: string;
+  prize_pool_eth: number;
+  bets_count: number;
+  is_winner: boolean;
 }
 
 export interface StatsData {
@@ -22,6 +24,13 @@ export interface StatsData {
   total_bets: number;
   total_prize_pool_wei: string;
   total_prize_pool_eth: number;
+  weapon_equivalents: { name: string; count: number; img: string }[];
+}
+
+export interface LeaderboardData {
+  rank: number;
+  address: string;
+  total_bet_eth: number;
 }
 
 export function useStats() {
@@ -54,6 +63,17 @@ export function useTeams() {
       return response.data;
     },
     refetchInterval: 5000,
+  });
+}
+
+export function useLeaderboard() {
+  return useQuery<LeaderboardData[]>({
+    queryKey: ['leaderboard'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_BASE_URL}/leaderboard`);
+      return response.data;
+    },
+    refetchInterval: 5000, // Refresh every 5 seconds
   });
 }
 
