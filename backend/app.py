@@ -8,11 +8,16 @@ from dotenv import load_dotenv
 import threading
 import time
 import requests
-from datetime import datetime
+from datetime import datetime, timezone # Added timezone
 from sqlalchemy import func, cast, Numeric
+import urllib.parse # For URL encoding
+
+# Load environment variables
+load_dotenv()
+# Move API key loading to global scope for application-wide access
+steamdt_api_key = os.getenv("STEAMDT_API_KEY")
 
 # 1. 初始化配置
-load_dotenv()
 app = Flask(__name__)
 
 # CORS 配置 - 生产环境允许前端域名，开发环境只允许localhost
@@ -72,9 +77,80 @@ ETHERSCAN_BASE_URL = "https://api.etherscan.io/v2/api"  # V2 API for all network
 # 目标方法ID：bet(uint265 _teamId)
 TARGET_METHOD_ID = "0x7365870b"
 
-# Pre-defined list of popular CS2 weapon skins and their approximate USD prices
+def get_live_dragon_lore_price_usd():
+    """
+    Fetches the live price of a Dragon Lore from the user's custom API endpoint.
+    This version has been cleaned up to reduce excessive logging.
+    """
+    hash_name = "AWP | Dragon Lore (Factory New)"
+    fallback_price_usd = 10000
+
+    try:
+        # 1. Construct and call the API
+        base_url = "https://buffotte.hezhili.online/api/bufftracker/price/"
+        encoded_hash_name = urllib.parse.quote(hash_name)
+        full_url = f"{base_url}{encoded_hash_name}"
+        response = requests.get(full_url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if not data.get("success") or not data.get("data"):
+            raise ValueError("Custom API returned success=false or no data field")
+
+        # 2. Select the best price
+        platforms = data["data"]
+        price_cny = 0
+        preferred_platforms = ["BUFF", "C5", "YOUPIN", "STEAM"]
+        
+        for platform_name in preferred_platforms:
+            platform_data = next((p for p in platforms if p.get("platform") == platform_name and p.get("sellPrice") and p.get("sellCount", 0) > 0), None)
+            if platform_data:
+                price_cny = platform_data["sellPrice"]
+                break
+        
+        if price_cny == 0:
+            # Fallback to any platform if preferred ones are not available
+            platform_data = next((p for p in platforms if p.get("sellPrice") and p.get("sellCount", 0) > 0), None)
+            if platform_data:
+                price_cny = platform_data["sellPrice"]
+
+        if price_cny == 0:
+            raise ValueError("No valid sell price found on any platform from custom API")
+
+        # 3. Convert currency and update cache
+        rate_response = requests.get("https://api.frankfurter.app/latest?from=CNY&to=USD", timeout=10)
+        rate_response.raise_for_status()
+        exchange_rate = rate_response.json()["rates"]["USD"]
+        
+        price_usd = price_cny * exchange_rate
+        # --- CLEANED LOG ---
+        print(f"✅ Live Dragon Lore price updated: ${price_usd:.2f}")
+
+        with app.app_context():
+            weapon = Weapon.query.get(hash_name)
+            if weapon:
+                weapon.price_usd = price_usd
+            else:
+                weapon = Weapon(hash_name=hash_name, price_usd=price_usd)
+                db.session.add(weapon)
+            db.session.commit()
+            
+        return price_usd
+
+    except Exception as e:
+        # --- CLEANED LOG ---
+        print(f"❌ Could not fetch live Dragon Lore price: {e}. Using cache/fallback.")
+        with app.app_context():
+            # FIX: Updated from legacy db.query.get() to db.session.get()
+            weapon = db.session.get(Weapon, hash_name)
+            if weapon:
+                return weapon.price_usd
+        return fallback_price_usd
+
+# Pre-defined list of popular CS2 weapon skins
+# This list MUST be defined AFTER the functions it calls.
 WEAPON_SKINS = [
-    {"name": "Dragon Lore (AWP)", "price": 4000, "img": "/skins/dragon_lore.png"},
+    {"name": "Dragon Lore (AWP)", "price_func": get_live_dragon_lore_price_usd, "img": "/Dragon Lore (AWP).webp"},
     {"name": "Karambit | Case Hardened (Blue Gem)", "price": 100000, "img": "/skins/karambit_blue_gem.png"},
     {"name": "Howl (M4A4)", "price": 3000, "img": "/skins/howl.png"},
     {"name": "AK-47 | Fire Serpent", "price": 1500, "img": "/skins/fire_serpent.png"},
@@ -82,6 +158,12 @@ WEAPON_SKINS = [
 ]
 
 # --- 2. 数据库模型 (Models) ---
+
+class Weapon(db.Model):
+    """缓存CS2武器价格"""
+    hash_name = db.Column(db.String(255), primary_key=True)
+    price_usd = db.Column(db.Float, default=0.0)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class GameState(db.Model):
     """存储游戏的全局状态"""
@@ -321,10 +403,9 @@ def process_transactions(transactions, processed_tx_hashes):
                     team_id = int(team_id_hex, 16)
                 
                 # 解析时间戳用于datetime字段
-                time_stamp_int = int(time_stamp) if time_stamp else 0
-                tx_timestamp = datetime.utcfromtimestamp(time_stamp_int) if time_stamp_int > 0 else datetime.utcnow()
-                
-                print(f"🎯 New bet detected: {tx.get('from', '')} bet {web3.from_wei(int(tx.get('value', '0')), 'ether')} ETH on team {team_id}")
+                time_stamp_int = int(tx.get('timeStamp', '0'))
+                # FIX: Updated from deprecated utcfromtimestamp to timezone-aware fromtimestamp
+                tx_timestamp = datetime.fromtimestamp(time_stamp_int, timezone.utc) if time_stamp_int > 0 else datetime.now(timezone.utc)
                 
                 # 记录所有API字段到数据库（数据库唯一约束会自动去重）
                 with app.app_context():
@@ -425,9 +506,16 @@ def record_bet():
         )
         db.session.add(new_bet)
         db.session.commit()
-        return jsonify({"message": "Bet recorded successfully", "bet_id": new_bet.id})
+        
+        # --- FIX: Trigger stats update after recording a new bet ---
+        print("🚀 New bet recorded, triggering stats update...")
+        update_team_stats()
+        # ---------------------------------------------------------
+        
+        return jsonify({"message": "Bet recorded and stats updated successfully", "bet_id": new_bet.id})
     except Exception as e:
         db.session.rollback()
+        print(f"❌ Error recording bet: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/reset_database', methods=['POST'])
@@ -481,9 +569,7 @@ def get_status():
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    """获取全局统计数据"""
-    from sqlalchemy import func
-    
+    """获取全局统计数据, now with cleaned logging."""
     # 计算总唯一参与者数量
     total_unique_participants = db.session.query(func.count(func.distinct(UserBet.user_address))).scalar()
     
@@ -499,20 +585,32 @@ def get_stats():
     weapon_equivalents = []
     try:
         eth_price_response = requests.get('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT')
+        eth_price_response.raise_for_status()
         eth_price_usd = float(eth_price_response.json()['price'])
         total_prize_pool_usd = total_prize_pool_eth * eth_price_usd
         
+        # The detailed logging within this loop is now removed.
         for weapon in WEAPON_SKINS:
-            if total_prize_pool_usd > weapon['price']:
-                count = int(total_prize_pool_usd / weapon['price'])
+            price = weapon.get("price")
+            if "price_func" in weapon:
+                price = weapon["price_func"]() # Call function for dynamic price
+            
+            if price and price > 0:
+                count = int(total_prize_pool_usd / price)
+                progress = (total_prize_pool_usd % price) / price * 100
                 weapon_equivalents.append({
                     "name": weapon['name'],
                     "count": count,
-                    "img": weapon['img']
+                    "img": weapon['img'],
+                    "price_usd": price,
+                    "progress": round(progress, 2)
                 })
+        
+        weapon_equivalents.sort(key=lambda x: x['count'], reverse=True)
+
     except Exception as e:
-        print(f"Could not calculate weapon equivalents: {e}")
-        # Intentionally left empty on failure
+        # Error during the broader stats calculation
+        print(f"❌ Error in /api/stats weapon calculation: {e}")
 
     return jsonify({
         "total_unique_participants": total_unique_participants,

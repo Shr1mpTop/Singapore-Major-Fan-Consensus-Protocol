@@ -24,6 +24,12 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # 数据库模型定义（与app.py中的相同）
+class Weapon(db.Model):
+    """缓存CS2武器价格"""
+    hash_name = db.Column(db.String(255), primary_key=True)
+    price_usd = db.Column(db.Float, default=0.0)
+    last_updated = db.Column(db.DateTime, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
+
 class GameState(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     status = db.Column(db.Integer, default=0)
@@ -75,27 +81,37 @@ class UserBet(db.Model):
 def reset_database():
     """清空数据库并重新初始化"""
     try:
-        print("正在清空数据库...")
-        print(f"Database URI: {app.config['SQLALCHEMY_DATABASE_URI']}")
-        
-        # 使用引擎直接创建表
-        from sqlalchemy import create_engine
-        engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
-        
-        print("Creating all tables...")
-        db.metadata.create_all(engine)
-        
-        # 检查表是否创建成功
-        from sqlalchemy import inspect
-        inspector = inspect(engine)
-        tables = inspector.get_table_names()
-        print(f"Created tables: {tables}")
-        
-        print("数据库已重置完成！")
+        with app.app_context():
+            print("正在清空数据库...")
+            db.drop_all() # Drops all tables
+            print("所有表格已删除。")
+            db.create_all() # Recreates all tables based on current models
+            print("所有表格已根据最新模型重建。")
+
+            # Re-initialize GameState
+            initial_state = GameState(id=1, status=0, total_prize_pool="0", winning_team_id=None)
+            db.session.add(initial_state)
+
+            # Pre-populate with initial teams, ensuring IDs match the blockchain's array index
+            teams_to_add = [
+                Team(id=0, name='Team Vitality'),
+                Team(id=1, name='TYLOO'),
+                Team(id=2, name='G2 Esports'),
+                Team(id=3, name='FaZe Clan'),
+                Team(id=4, name='Natus Vincere'),
+                Team(id=5, name='Heroic'),
+                Team(id=6, name='ENCE'),
+                Team(id=7, name='Team Spirit')
+            ]
+            db.session.bulk_save_objects(teams_to_add)
+            print(f"已添加 {len(teams_to_add)} 个初始战队。")
+            
+            db.session.commit()
+            print("数据库已成功重置和初始化！")
+
     except Exception as e:
-        print(f"Error in reset_database: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"数据库重置过程中发生错误: {e}")
+        db.session.rollback()
 
 if __name__ == "__main__":
     reset_database()
