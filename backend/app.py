@@ -289,12 +289,19 @@ def update_game_status():
                 db.session.add(game_state)
 
             # 更新状态和获胜队伍ID
+            old_status = game_state.status
             game_state.status = int(contract_status)
+            
             # 只有当游戏状态是Finished或Refunding时，winning_team_id才有意义
             if contract_status in [2, 3]:  # Finished or Refunding
                 game_state.winning_team_id = int(contract_winning_team_id)
             else:
                 game_state.winning_team_id = None
+
+            # 如果游戏刚刚停止（状态变为Stopped），保存所有用户的投注记录
+            if old_status != 1 and contract_status == 1:
+                print("🎯 Game stopped! Saving all user bets to database using Etherscan API...")
+                save_all_user_bets_to_database()
 
             db.session.commit()
             print(f"✅ Updated game status: status={contract_status}, winning_team_id={contract_winning_team_id}")
@@ -404,18 +411,22 @@ def setup_event_listeners():
         except Exception as e:
             print(f"Failed to start event listener: {e}")
 
-    # 启动监听线程
+    # 启动监听线程（使用信号量控制并发）
     if etherscan_api_key:
-        listener_thread = threading.Thread(target=event_listener, daemon=True)
-        listener_thread.start()
-        print("Etherscan event listener thread started (1 minute intervals)")
+        t = safe_start_thread("EtherscanEventListener", event_listener)
+        if t:
+            print("Etherscan event listener thread started (1 minute intervals)")
+        else:
+            print("⚠️ Etherscan event listener not started (semaphore limit)")
     else:
         print("Etherscan API key not configured, skipping event listener")
 
-    # 启动游戏状态同步线程
-    status_sync_thread = threading.Thread(target=game_status_sync_worker, daemon=True)
-    status_sync_thread.start()
-    print("Game status sync thread started (30 second intervals)")
+    # 启动游戏状态同步线程（使用信号量控制并发）
+    t2 = safe_start_thread("GameStatusSyncWorker", game_status_sync_worker)
+    if t2:
+        print("Game status sync thread started (30 second intervals)")
+    else:
+        print("⚠️ Game status sync thread not started (semaphore limit)")
 
 def process_transactions(transactions, processed_tx_hashes):
     """处理Etherscan API返回的交易列表，记录所有字段到数据库
@@ -604,6 +615,168 @@ def get_user_bets(user_address):
             } for bet in bets
         ]
     })
+
+@app.route('/api/user_betting_history/<user_address>', methods=['GET'])
+def get_user_betting_history(user_address):
+    """获取用户的投注历史和收益计算"""
+    try:
+        # 获取用户的所有投注记录
+        bets = UserBet.query.filter_by(user_address=user_address).all()
+        
+        if not bets:
+            return jsonify({
+                "total_bets": 0,
+                "total_invested_eth": 0,
+                "total_returned_eth": 0,
+                "net_profit_eth": 0,
+                "bets": []
+            })
+        
+        # 获取当前游戏状态
+        game_state = GameState.query.first()
+        if not game_state:
+            return jsonify({"error": "Game state not found"}), 404
+        
+        # 获取所有队伍信息
+        teams_data = []
+        try:
+            contract_teams = contract.functions.getTeams().call()
+            for team in contract_teams:
+                teams_data.append({
+                    "id": team[0],
+                    "name": team[1],
+                    "total_bet_amount": float(web3.from_wei(team[2], 'ether'))
+                })
+        except Exception as e:
+            print(f"Error getting teams data: {e}")
+            teams_data = []
+        
+        # 计算每个投注的收益
+        total_invested = 0
+        total_returned = 0
+        bet_history = []
+        
+        for bet in bets:
+            bet_amount_eth = float(web3.from_wei(int(bet.amount_wei), 'ether'))
+            total_invested += bet_amount_eth
+            
+            # 查找队伍信息
+            team_info = next((t for t in teams_data if t["id"] == bet.team_id), None)
+            team_name = team_info["name"] if team_info else f"Team {bet.team_id}"
+            
+            # 计算收益
+            returned_amount = 0
+            profit_loss = -bet_amount_eth  # 默认亏损（投注成本）
+            status = "Lost"
+            
+            if game_state.status == 2:  # Finished
+                if bet.team_id == game_state.winning_team_id:
+                    # 获胜队伍 - 计算奖金
+                    if team_info and team_info["total_bet_amount"] > 0:
+                        total_prize_pool = float(web3.from_wei(int(game_state.total_prize_pool), 'ether'))
+                        distributable_prize = total_prize_pool * 0.9  # 扣除10%公益金
+                        returned_amount = (bet_amount_eth / team_info["total_bet_amount"]) * distributable_prize
+                        profit_loss = returned_amount - bet_amount_eth
+                        status = "Won"
+                        total_returned += returned_amount
+                    else:
+                        status = "Won (No calculation available)"
+                else:
+                    status = "Lost"
+            elif game_state.status == 3:  # Refunding
+                # 全额退款
+                returned_amount = bet_amount_eth
+                profit_loss = 0  # 保本
+                status = "Refunded"
+                total_returned += returned_amount
+            
+            bet_history.append({
+                "team_id": bet.team_id,
+                "team_name": team_name,
+                "bet_amount_eth": bet_amount_eth,
+                "returned_amount_eth": returned_amount,
+                "profit_loss_eth": profit_loss,
+                "status": status,
+                "timestamp": bet.timestamp.isoformat() if bet.timestamp else None
+            })
+        
+        # 计算净收益
+        net_profit = total_returned - total_invested
+        
+        return jsonify({
+            "total_bets": len(bets),
+            "total_invested_eth": total_invested,
+            "total_returned_eth": total_returned,
+            "net_profit_eth": net_profit,
+            "game_status": game_state.status,
+            "winning_team_id": game_state.winning_team_id,
+            "bets": bet_history
+        })
+        
+    except Exception as e:
+        print(f"Error getting user betting history: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/user_contract_bets/<user_address>', methods=['GET'])
+def get_user_contract_bets(user_address):
+    """从数据库获取用户的投注历史记录"""
+    try:
+        # 验证用户地址格式并转换为小写
+        try:
+            user_address = Web3.to_checksum_address(user_address).lower()
+        except:
+            return jsonify({"error": "Invalid user address format"}), 400
+        
+        # 从数据库查询用户的投注历史
+        user_bets = UserBet.query.filter_by(user_address=user_address).order_by(UserBet.timestamp.desc()).all()
+        
+        bets = []
+        for bet in user_bets:
+            bets.append({
+                "team_id": bet.team_id,
+                "team_name": bet.team_name,
+                "amount_wei": bet.amount_wei,
+                "amount_eth": float(web3.from_wei(int(bet.amount_wei), 'ether')),
+                "timestamp": bet.timestamp.isoformat() if bet.timestamp else None,
+                "tx_hash": bet.hash
+            })
+        
+        return jsonify({"bets": bets})
+        
+    except Exception as e:
+        print(f"Error getting user bets from database: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/historical_team_stats', methods=['GET'])
+def get_historical_team_stats():
+    """从数据库获取队伍的历史投注统计（用于计算收益，即使合约数据被清除）"""
+    try:
+        # 从数据库计算每个队伍的总投注金额
+        from sqlalchemy import func
+        
+        team_stats = db.session.query(
+            UserBet.team_id,
+            UserBet.team_name,
+            func.sum(UserBet.amount_wei).label('total_amount_wei')
+        ).group_by(UserBet.team_id, UserBet.team_name).all()
+        
+        teams_data = []
+        for team_id, team_name, total_amount_wei in team_stats:
+            teams_data.append({
+                "id": team_id,
+                "name": team_name,
+                "prize_pool_eth": float(web3.from_wei(int(total_amount_wei), 'ether')),
+                "prize_pool_wei": str(total_amount_wei)
+            })
+        
+        # 按ID排序
+        teams_data.sort(key=lambda x: x['id'])
+        
+        return jsonify({"teams": teams_data})
+        
+    except Exception as e:
+        print(f"Error getting historical team stats: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/record_bet', methods=['POST'])
 def record_bet():
@@ -863,16 +1036,202 @@ def get_teams():
 # 初始化数据库
 with app.app_context():
     db.create_all()
-    
+
     # 初始化团队统计数据
     update_team_stats()
 
-# 启动事件监听器
-setup_event_listeners()
+# 移除模块级别的线程启动，避免重复创建线程
+# setup_event_listeners()  # 移除这一行
+
+def save_all_user_bets_to_database():
+    """使用Etherscan API保存所有用户的投注记录到数据库（用于历史记录）"""
+    try:
+        print("💾 Saving all user bets to database using Etherscan API...")
+        
+        # 获取Etherscan API的所有交易记录
+        transactions = get_contract_transactions_from_etherscan()
+        
+        if not transactions:
+            print("⚠️  No transactions found from Etherscan API")
+            return
+        
+        # 用于去重的已处理交易哈希集合
+        processed_tx_hashes = set()
+        saved_count = 0
+        
+        # 获取当前战队信息，用于team_id到team_name的映射
+        try:
+            teams_data = contract.functions.getTeams().call()
+            team_id_to_name = {team[0]: team[1] for team in teams_data}
+        except Exception as e:
+            print(f"Error getting teams data: {e}")
+            team_id_to_name = {}
+        
+        for tx in transactions:
+            try:
+                tx_hash = tx.get('hash', '')
+                time_stamp = tx.get('timeStamp', '')
+                
+                # 使用hash+timeStamp组合进行去重
+                dedup_key = f"{tx_hash}_{time_stamp}"
+                if dedup_key in processed_tx_hashes:
+                    continue  # 跳过已处理的交易
+                
+                # 检查是否是成功的bet交易
+                method_id = tx.get('methodId', '')
+                tx_status = tx.get('txreceipt_status', '0')  # 1=成功, 0=失败
+                
+                if method_id == TARGET_METHOD_ID and tx_status == '1':
+                    # 解析交易输入数据获取team_id
+                    input_data = tx.get('input', '')
+                    team_id = 0
+                    if len(input_data) >= 74:  # 0x + 8字节methodId + 32字节teamId
+                        team_id_hex = input_data[10:74]
+                        team_id = int(team_id_hex, 16)
+                    
+                    # 解析时间戳用于datetime字段
+                    time_stamp_int = int(tx.get('timeStamp', '0'))
+                    # FIX: Updated from deprecated utcfromtimestamp to timezone-aware fromtimestamp
+                    tx_timestamp = datetime.fromtimestamp(time_stamp_int, timezone.utc) if time_stamp_int > 0 else datetime.now(timezone.utc)
+                    
+                    # 检查数据库中是否已存在此记录
+                    existing_bet = UserBet.query.filter_by(hash=tx_hash, timeStamp_str=time_stamp).first()
+                    if existing_bet:
+                        processed_tx_hashes.add(dedup_key)
+                        continue  # 已存在，跳过
+                    
+                    # 记录所有API字段到数据库
+                    with app.app_context():
+                        new_bet = UserBet(
+                            # 核心投注信息
+                            user_address=tx.get('from', ''),
+                            team_id=team_id,
+                            team_name=team_id_to_name.get(team_id, f'Team {team_id}'),
+                            amount_wei=tx.get('value', '0'),
+                            
+                            # 所有API字段
+                            blockNumber=tx.get('blockNumber', ''),
+                            blockHash=tx.get('blockHash', ''),
+                            timeStamp_str=time_stamp,
+                            hash=tx_hash,
+                            nonce=tx.get('nonce', ''),
+                            transactionIndex=tx.get('transactionIndex', ''),
+                            to=tx.get('to', ''),
+                            value=tx.get('value', '0'),
+                            gas=tx.get('gas', ''),
+                            gasPrice=tx.get('gasPrice', ''),
+                            input=input_data,
+                            methodId=method_id,
+                            functionName=tx.get('functionName', ''),
+                            contractAddress=tx.get('contractAddress', ''),
+                            cumulativeGasUsed=tx.get('cumulativeGasUsed', ''),
+                            txreceipt_status=tx_status,
+                            gasUsed=tx.get('gasUsed', ''),
+                            confirmations=tx.get('confirmations', ''),
+                            isError=tx.get('isError', ''),
+                            
+                            # 解析后的时间戳
+                            timestamp=tx_timestamp
+                        )
+                        
+                        try:
+                            db.session.add(new_bet)
+                            db.session.commit()
+                            saved_count += 1
+                            processed_tx_hashes.add(dedup_key)
+                            print(f"  ✅ Saved bet: {tx.get('from', '')[:10]}... -> Team {team_id} ({web3.from_wei(int(tx.get('value', '0')), 'ether')} ETH)")
+                        except Exception as db_error:
+                            # 如果是唯一约束冲突，说明已存在，跳过
+                            if 'UNIQUE constraint failed' in str(db_error):
+                                processed_tx_hashes.add(dedup_key)
+                                continue
+                            else:
+                                print(f"  ❌ Database error: {db_error}")
+                                db.session.rollback()
+                
+            except Exception as e:
+                print(f"  ❌ Error processing transaction {tx.get('hash', 'unknown')}: {e}")
+        
+        print(f"✅ Successfully saved {saved_count} betting records to database")
+        
+    except Exception as e:
+        print(f"❌ Error saving user bets to database: {e}")
+        import traceback
+        traceback.print_exc()
+
+# 全局变量用于跟踪线程是否已启动
+threads_started = False
+
+# 信号量配置：限制每个进程中同时运行的后台线程数（可通过环境变量调整）
+MAX_BG_THREADS = int(os.getenv("MAX_BG_THREADS", "1"))
+bg_thread_semaphore = threading.BoundedSemaphore(MAX_BG_THREADS)
+bg_semaphore_lock = threading.Lock()
+bg_running_count = 0
+
+
+def safe_start_thread(name, target, *args, **kwargs):
+    """安全启动后台线程：非阻塞获取信号量，启动后在退出时释放信号量并记录日志"""
+    acquired = bg_thread_semaphore.acquire(blocking=False)
+    if not acquired:
+        print(f"⚠️ Skipping starting {name}: max background threads ({MAX_BG_THREADS}) reached")
+        return None
+
+    def wrapper(*a, **k):
+        global bg_running_count
+        with bg_semaphore_lock:
+            bg_running_count += 1
+            print(f"🔧 {name} started (running={bg_running_count})")
+
+        try:
+            target(*a, **k)
+        except Exception as e:
+            print(f"❌ Exception in {name}: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            with bg_semaphore_lock:
+                bg_running_count -= 1
+                print(f"⛔ {name} exited (running={bg_running_count})")
+            try:
+                bg_thread_semaphore.release()
+            except ValueError:
+                print(f"❌ Error releasing semaphore for {name}")
+
+    t = threading.Thread(target=wrapper, args=args, kwargs=kwargs, daemon=True, name=name)
+    t.start()
+    return t
+
+
+def start_background_threads():
+    """启动后台线程（只执行一次）"""
+    global threads_started
+    if not threads_started:
+        # setup_event_listeners 会使用 safe_start_thread 来启动线程
+        setup_event_listeners()
+        threads_started = True
+
+# 在第一次请求前启动后台线程（兼容处理）
+def initialize_background_threads():
+    start_background_threads()
+
+try:
+    app.before_first_request(initialize_background_threads)
+except AttributeError:
+    @app.before_request
+    def before_request_hook():
+        initialize_background_threads()
+except AttributeError:
+    # 如果不支持before_first_request，使用before_request但只执行一次
+    @app.before_request
+    def before_request_hook():
+        initialize_background_threads()
 
 # --- 应用启动 ---
 
 if __name__ == '__main__':
+    # 在应用启动前初始化事件监听器（开发环境）
+    start_background_threads()
+
     # 生产环境使用gunicorn，开发环境使用flask内置服务器
     if os.getenv('FLASK_ENV') == 'production':
         from gunicorn.app.wsgiapp import WSGIApplication
