@@ -164,7 +164,8 @@ export function WithdrawSection() {
 
   // Check if withdrawal is allowed
   const canWithdraw = status?.status === 2 || status?.status === 3; // Finished or Refunding
-  const hasWithdrawableBets = userBets && userBets.some((bet) => calculateWithdrawableAmount(bet) > 0);
+  const hasWithdrawableBets =
+    userBets && userBets.some((bet) => calculateWithdrawableAmount(bet) > 0);
 
   if (!address) {
     return (
@@ -231,70 +232,70 @@ export function WithdrawSection() {
           userBets
             .filter((bet) => calculateWithdrawableAmount(bet) > 0)
             .map((bet) => {
-            const withdrawableAmount = calculateWithdrawableAmount(bet);
-            const isUserWinner = isWinner(bet.team_id);
-            const teamName =
-              teams?.find((t) => t.id === bet.team_id)?.name ||
-              `Team ${bet.team_id}`;
+              const withdrawableAmount = calculateWithdrawableAmount(bet);
+              const isUserWinner = isWinner(bet.team_id);
+              const teamName =
+                teams?.find((t) => t.id === bet.team_id)?.name ||
+                `Team ${bet.team_id}`;
 
-            return (
-              <div
-                key={bet.team_id}
-                className="bg-red-900/30 p-4 rounded-lg border border-red-500/20"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="text-red-100 font-semibold flex items-center gap-2">
-                      {teamName}
-                      {isUserWinner && (
-                        <span className="text-yellow-400 text-sm">
-                          🏆 Winning Team
-                        </span>
-                      )}
-                      {status?.status === 3 && (
-                        <span className="text-blue-400 text-sm">
-                          🔄 Full Refund
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-red-200 text-sm">
-                      Your Bet: {bet.amount_eth.toFixed(4)} ETH
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-yellow-400 font-bold text-lg">
-                      Withdrawable: {withdrawableAmount.toFixed(4)} ETH
-                    </p>
-                    {status?.status === 2 && isUserWinner && (
-                      <p className="text-green-400 text-xs">
-                        Prize Multiplier:{" "}
-                        {(withdrawableAmount / bet.amount_eth).toFixed(2)}x
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {status?.status === 2 && isUserWinner && (
-                  <div className="text-xs text-red-300 mb-3 p-2 bg-red-900/50 rounded">
-                    💰 Prize Calculation: (Your Bet ÷ Winner Team Total Bet) ×
-                    Distributable Prize Pool
-                  </div>
-                )}
-
-                <Button
-                  onClick={() => handleWithdraw(bet.team_id)}
-                  disabled={isPending || withdrawingTeam === bet.team_id}
-                  className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold"
+              return (
+                <div
+                  key={bet.team_id}
+                  className="bg-red-900/30 p-4 rounded-lg border border-red-500/20"
                 >
-                  {withdrawingTeam === bet.team_id
-                    ? "Processing..."
-                    : status?.status === 3
-                    ? "Confirm Refund"
-                    : "Withdraw Prize"}
-                </Button>
-              </div>
-            );
-          })
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-red-100 font-semibold flex items-center gap-2">
+                        {teamName}
+                        {isUserWinner && (
+                          <span className="text-yellow-400 text-sm">
+                            🏆 Winning Team
+                          </span>
+                        )}
+                        {status?.status === 3 && (
+                          <span className="text-blue-400 text-sm">
+                            🔄 Full Refund
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-red-200 text-sm">
+                        Your Bet: {bet.amount_eth.toFixed(4)} ETH
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-yellow-400 font-bold text-lg">
+                        Withdrawable: {withdrawableAmount.toFixed(4)} ETH
+                      </p>
+                      {status?.status === 2 && isUserWinner && (
+                        <p className="text-green-400 text-xs">
+                          Prize Multiplier:{" "}
+                          {(withdrawableAmount / bet.amount_eth).toFixed(2)}x
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {status?.status === 2 && isUserWinner && (
+                    <div className="text-xs text-red-300 mb-3 p-2 bg-red-900/50 rounded">
+                      💰 Prize Calculation: (Your Bet ÷ Winner Team Total Bet) ×
+                      Distributable Prize Pool
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={() => handleWithdraw(bet.team_id)}
+                    disabled={isPending || withdrawingTeam === bet.team_id}
+                    className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold"
+                  >
+                    {withdrawingTeam === bet.team_id
+                      ? "Processing..."
+                      : status?.status === 3
+                      ? "Confirm Refund"
+                      : "Withdraw Prize"}
+                  </Button>
+                </div>
+              );
+            })
         )}
 
         {isSuccess && (
