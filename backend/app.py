@@ -156,17 +156,17 @@ def get_live_dragon_lore_price_usd():
 # This list MUST be defined AFTER the functions it calls.
 # Listed from lowest to highest value, with Dragon Lore as the final milestone
 WEAPON_SKINS = [
-    {"name": "Tec-9 | Groundwater (Battle-Scarred)", "price_func": lambda: get_live_weapon_price_usd("Tec-9 | Groundwater (Battle-Scarred)", 5), "img": "/skins/Tec-9 | Groundwater.webp"},
-    {"name": "MAC-10 | Tatter (Well-Worn)", "price_func": lambda: get_live_weapon_price_usd("MAC-10 | Tatter (Well-Worn)", 8), "img": "/skins/MAC-10 | Tatter (Well-Worn).webp"},
-    {"name": "StatTrak™ Music Kit | TWERL and Ekko & Sidetrack, Under Bright Lights", "price_func": lambda: get_live_weapon_price_usd("StatTrak™ Music Kit | TWERL and Ekko & Sidetrack, Under Bright Lights", 15), "img": "/skins/StatTrak™ Music Kit | TWERL and Ekko & Sidetrack, Under Bright Lights.webp"},
-    {"name": "Crasswater The Forgotten | Guerrilla Warfare", "price_func": lambda: get_live_weapon_price_usd("Crasswater The Forgotten | Guerrilla Warfare", 25), "img": "/skins/Crasswater The Forgotten | Guerrilla Warfare.webp"},
-    {"name": "Souvenir Galil AR | CAUTION! (Factory New)", "price_func": lambda: get_live_weapon_price_usd("Souvenir Galil AR | CAUTION! (Factory New)", 40), "img": "/skins/Souvenir Galil AR | CAUTION! (Factory New).webp"},
-    {"name": "M4A4 | Hellish (Minimal Wear)", "price_func": lambda: get_live_weapon_price_usd("M4A4 | Hellish (Minimal Wear)", 80), "img": "/skins/M4A4 | Hellish (Minimal Wear).webp"},
-    {"name": "StatTrak™ AK-47 | Vulcan (Well-Worn)", "price_func": lambda: get_live_weapon_price_usd("StatTrak™ AK-47 | Vulcan (Well-Worn)", 150), "img": "/skins/StatTrak™ AK-47 | Vulcan (Well-Worn).webp"},
-    {"name": "★ Sport Gloves | Nocts (Field-Tested)", "price_func": lambda: get_live_weapon_price_usd("★ Sport Gloves | Nocts (Field-Tested)", 300), "img": "/skins/Sport Gloves | Nocts (Field-Tested).webp"},
-    {"name": "★ Karambit | Gamma Doppler (Factory New)", "price_func": lambda: get_live_weapon_price_usd("★ Karambit | Gamma Doppler (Factory New)", 800), "img": "/skins/Karambit | Gamma Doppler (Factory New).webp"},
-    {"name": "★ Butterfly Knife | Crimson Web (Factory New)", "price_func": lambda: get_live_weapon_price_usd("★ Butterfly Knife | Crimson Web (Factory New)", 2000), "img": "/skins/Butterfly Knife | Crimson Web (Factory New).webp"},
-    {"name": "AWP | Dragon Lore (Factory New)", "price_func": get_live_dragon_lore_price_usd, "img": "/skins/AWP | Dragon Lore (Factory New).webp"},
+    {"name": "Tec-9 | Groundwater (Battle-Scarred)", "price_func": lambda: get_live_weapon_price_usd("Tec-9 | Groundwater (Battle-Scarred)", 5), "img": "/skins/Tec-9.webp"},
+    {"name": "MAC-10 | Tatter (Well-Worn)", "price_func": lambda: get_live_weapon_price_usd("MAC-10 | Tatter (Well-Worn)", 8), "img": "/skins/MAC-10.webp"},
+    {"name": "StatTrak™ Music Kit | TWERL and Ekko & Sidetrack, Under Bright Lights", "price_func": lambda: get_live_weapon_price_usd("StatTrak™ Music Kit | TWERL and Ekko & Sidetrack, Under Bright Lights", 15), "img": "/skins/MusicKit.webp"},
+    {"name": "Crasswater The Forgotten | Guerrilla Warfare", "price_func": lambda: get_live_weapon_price_usd("Crasswater The Forgotten | Guerrilla Warfare", 25), "img": "/skins/GuerrillaWarfare.webp"},
+    {"name": "Souvenir Galil AR | CAUTION! (Factory New)", "price_func": lambda: get_live_weapon_price_usd("Souvenir Galil AR | CAUTION! (Factory New)", 40), "img": "/skins/Galil.webp"},
+    {"name": "M4A4 | Hellish (Minimal Wear)", "price_func": lambda: get_live_weapon_price_usd("M4A4 | Hellish (Minimal Wear)", 80), "img": "/skins/Hellish.webp"},
+    {"name": "StatTrak™ AK-47 | Vulcan (Well-Worn)", "price_func": lambda: get_live_weapon_price_usd("StatTrak™ AK-47 | Vulcan (Well-Worn)", 150), "img": "/skins/AK-47.webp"},
+    {"name": "★ Sport Gloves | Nocts (Field-Tested)", "price_func": lambda: get_live_weapon_price_usd("★ Sport Gloves | Nocts (Field-Tested)", 300), "img": "/skins/SportGloves.webp"},
+    {"name": "★ Karambit | Gamma Doppler (Factory New)", "price_func": lambda: get_live_weapon_price_usd("★ Karambit | Gamma Doppler (Factory New)", 800), "img": "/skins/Karambit.webp"},
+    {"name": "★ Butterfly Knife | Crimson Web (Factory New)", "price_func": lambda: get_live_weapon_price_usd("★ Butterfly Knife | Crimson Web (Factory New)", 2000), "img": "/skins/Butterfly.webp"},
+    {"name": "AWP | Dragon Lore (Factory New)", "price_func": get_live_dragon_lore_price_usd, "img": "/skins/Dragon.webp"},
 ]
 
 # --- 2. 数据库模型 (Models) ---

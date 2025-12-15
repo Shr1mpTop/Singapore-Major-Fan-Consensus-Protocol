@@ -28,7 +28,7 @@ export function FunFactsSection() {
       return { 
         name: "AWP | Dragon Lore", 
         count: 0, 
-        img: "/Dragon Lore (AWP).webp", // Corrected the fallback image path
+        img: "/skins/Dragon.webp", // Updated to simplified filename
         progress: 0,
         price_usd: 4000
       };
@@ -130,7 +130,7 @@ export function FunFactsSection() {
                         }
                         
                         // 尝试2: 使用备用图片
-                        img.src = '/awp-dragon-lore-fallback.png';
+                        img.src = '/skins/Dragon.webp';
                       }}
                       loading="lazy"
                     />
