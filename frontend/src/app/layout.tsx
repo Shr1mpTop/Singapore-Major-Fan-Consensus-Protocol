@@ -29,6 +29,31 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
+          {process.env.NODE_ENV !== "production" && (
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `(() => {
+  const orig = console.error;
+  console.error = function(...args) {
+    try {
+      const msg = args[0];
+      if (typeof msg === 'string' && msg.includes('The final argument passed to useEffect changed size between renders')) {
+        const stack = new Error('useEffect size-change detected').stack;
+        orig('[DevUseEffectWatcher] useEffect size-change warning detected:', ...args);
+        orig('Captured stack:', stack);
+        window.__DEV_USE_EFFECT_STACKS__ = window.__DEV_USE_EFFECT_STACKS__ || [];
+        window.__DEV_USE_EFFECT_STACKS__.push({ msg, stack, time: Date.now() });
+      } else {
+        orig(...args);
+      }
+    } catch (e) {
+      orig(...args);
+    }
+  }
+})()`,
+              }}
+            />
+          )}
           {children}
         </Providers>
       </body>

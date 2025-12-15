@@ -70,6 +70,12 @@ interface BettingHistory {
   }[];
 }
 
+interface UserBet {
+  team_id: number;
+  amount_wei: string;
+  amount_eth: number;
+}
+
 export function WithdrawSection() {
   const { address, isConnected } = useAccount();
   const { data: status } = useStatus();

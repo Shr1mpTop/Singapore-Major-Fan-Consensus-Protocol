@@ -395,6 +395,7 @@ function StatsSection({
                       <AnimatedNumber
                         value={totalParticipants}
                         duration={0.8}
+                        decimals={0}
                       />
                     </motion.p>
                   )}
@@ -468,11 +469,16 @@ function StatsSection({
                           className={`text-sm font-medium ${
                             status?.status_text?.toLowerCase() === "open"
                               ? "text-green-300"
+                              : status?.status_text?.toLowerCase() ===
+                                "finished"
+                              ? "text-red-300"
                               : "text-yellow-300"
                           }`}
                         >
                           {status?.status_text?.toLowerCase() === "open"
                             ? "Active"
+                            : status?.status_text?.toLowerCase() === "finished"
+                            ? "Finished"
                             : "Pending"}
                         </span>
                       </motion.div>
@@ -675,7 +681,7 @@ function BettingSection({
                   className={`relative rounded-2xl overflow-hidden group transform transition-all duration-300 ${
                     winningTeam
                       ? winningTeam.id === team.id
-                        ? "shadow-2xl shadow-yellow-400/50 border-2 border-yellow-400"
+                        ? "shadow-2xl shadow-yellow-400/80 border-4 border-yellow-400 ring-4 ring-yellow-400/30"
                         : "opacity-50 grayscale"
                       : ""
                   }`}
@@ -686,19 +692,35 @@ function BettingSection({
                   >
                     {/* Winner Badge */}
                     {winningTeam && winningTeam.id === team.id && (
-                      <motion.div
-                        className="absolute top-3 right-3 bg-yellow-400 text-gray-900 font-bold px-4 py-1 rounded-full text-sm shadow-lg"
-                        initial={{ scale: 0, rotate: -180 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        transition={{
-                          type: "spring",
-                          damping: 10,
-                          stiffness: 150,
-                          delay: 0.5,
-                        }}
-                      >
-                        WINNER
-                      </motion.div>
+                      <>
+                        {/* Glow Effect */}
+                        <motion.div
+                          className="absolute top-3 right-3 w-32 h-12 bg-yellow-400/20 rounded-full blur-xl"
+                          animate={{
+                            opacity: [0.3, 0.8, 0.3],
+                            scale: [1, 1.2, 1],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                        />
+                        <motion.div
+                          className="absolute top-3 right-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 font-black px-6 py-2 rounded-full text-lg shadow-2xl border-2 border-yellow-300 z-10"
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{
+                            type: "spring",
+                            damping: 10,
+                            stiffness: 150,
+                            delay: 0.5,
+                          }}
+                          whileHover={{ scale: 1.1 }}
+                        >
+                          🏆 WINNER 🏆
+                        </motion.div>
+                      </>
                     )}
                     <CardHeader className="p-0 mb-4">
                       <motion.img
