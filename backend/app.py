@@ -365,6 +365,135 @@ def get_weapon_image(weapon_name):
     }
     return weapon_img_mapping.get(weapon_name, "/skins/default.webp")
 
+def update_weapon_prices():
+    """从bufftracker API更新武器价格数据"""
+    print("\n🔄 Updating weapon prices from bufftracker API...")
+    
+    # 武器hash_name列表
+    weapon_names = [
+        "AWP | Dragon Lore (Factory New)",
+        "★ Butterfly Knife | Crimson Web (Factory New)",
+        "★ Karambit | Gamma Doppler (Factory New)",
+        "★ Sport Gloves | Nocts (Field-Tested)",
+        "StatTrak™ AK-47 | Vulcan (Well-Worn)",
+        "M4A4 | Hellish (Minimal Wear)",
+        "Souvenir Galil AR | CAUTION! (Factory New)",
+        "Crasswater The Forgotten | Guerrilla Warfare",
+        "StatTrak™ Music Kit | TWERL and Ekko & Sidetrack, Under Bright Lights",
+        "MAC-10 | Tatter (Well-Worn)",
+        "Tec-9 | Groundwater (Battle-Scarred)",
+    ]
+    
+    # 获取CNY到USD汇率
+    exchange_rate = 0.14  # 默认汇率
+    try:
+        exchange_response = requests.get(
+            "https://api.frankfurter.app/latest?from=CNY&to=USD",
+            timeout=5
+        )
+        if exchange_response.status_code == 200:
+            exchange_rate = exchange_response.json()['rates']['USD']
+            print(f"  ✓ Exchange rate: 1 CNY = {exchange_rate} USD")
+    except Exception as e:
+        print(f"  ⚠ Failed to get exchange rate, using default: {e}")
+    
+    # 平台优先级
+    PLATFORM_PRIORITY = ["BUFF", "C5", "YOUPIN", "STEAM"]
+    
+    with app.app_context():
+        updated_count = 0
+        failed_count = 0
+        
+        for weapon_name in weapon_names:
+            try:
+                # URL编码武器名称
+                encoded_name = urllib.parse.quote(weapon_name)
+                api_url = f"https://buffotte.hezhili.online/api/bufftracker/price/{encoded_name}"
+                
+                response = requests.get(api_url, timeout=10)
+                response.raise_for_status()
+                result = response.json()
+                
+                # 从响应中提取价格数据
+                # API返回格式: {"data": [{"platform": "BUFF", "sellPrice": 123, "sellCount": 5}, ...]}
+                price_data_list = result.get('data', [])
+                price_cny = None
+                selected_platform = None
+                
+                # 如果data是列表，转换为字典
+                if isinstance(price_data_list, list):
+                    price_data = {}
+                    for item in price_data_list:
+                        platform = item.get('platform', '')
+                        if platform:
+                            price_data[platform] = item
+                else:
+                    price_data = price_data_list
+                
+                # 按优先级选择平台价格
+                for platform in PLATFORM_PRIORITY:
+                    if platform in price_data:
+                        platform_info = price_data[platform]
+                        sell_price = platform_info.get('sellPrice', 0)
+                        sell_count = platform_info.get('sellCount', 0)
+                        
+                        if sell_price > 0 and sell_count > 0:
+                            price_cny = sell_price
+                            selected_platform = platform
+                            break
+                
+                # 如果优先平台没有价格，尝试任何有效价格
+                if price_cny is None:
+                    for platform, platform_info in price_data.items():
+                        sell_price = platform_info.get('sellPrice', 0)
+                        sell_count = platform_info.get('sellCount', 0)
+                        
+                        if sell_price > 0 and sell_count > 0:
+                            price_cny = sell_price
+                            selected_platform = platform
+                            break
+                
+                if price_cny and price_cny > 0:
+                    # 转换为USD
+                    price_usd = price_cny * exchange_rate
+                    
+                    # 更新数据库
+                    weapon = Weapon.query.filter_by(hash_name=weapon_name).first()
+                    if weapon:
+                        weapon.price_usd = price_usd
+                        weapon.last_updated = datetime.now(timezone.utc)
+                    else:
+                        weapon = Weapon(
+                            hash_name=weapon_name,
+                            price_usd=price_usd,
+                            last_updated=datetime.now(timezone.utc)
+                        )
+                        db.session.add(weapon)
+                    
+                    updated_count += 1
+                    print(f"  ✓ {weapon_name[:50]}... [{selected_platform}]: ¥{price_cny:.2f} → ${price_usd:.2f}")
+                else:
+                    print(f"  ⚠ {weapon_name[:50]}... No valid price data")
+                    failed_count += 1
+                    
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 404:
+                    print(f"  ⚠ {weapon_name[:50]}... Not found in API (404)")
+                else:
+                    print(f"  ❌ {weapon_name[:50]}... HTTP Error: {e}")
+                failed_count += 1
+            except Exception as e:
+                print(f"  ❌ {weapon_name[:50]}... Error: {e}")
+                failed_count += 1
+        
+        db.session.commit()
+        print(f"\n✓ Updated {updated_count} weapon prices")
+        if failed_count > 0:
+            print(f"⚠ Failed to update {failed_count} weapons (will keep cached prices if available)")
+
+
+
+
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     """获取全局统计数据"""
@@ -597,6 +726,103 @@ def initialize_app():
     # 首次请求时启动后台线程
     start_background_threads()
 
+def auto_reset_database():
+    """自动重置数据库（保留武器名称）"""
+    print("=" * 60)
+    print("🔄 AUTO DATABASE RESET ON STARTUP")
+    print("=" * 60)
+    
+    with app.app_context():
+        # Step 1: Backup weapon names
+        print(f"\n[1/4] Backing up weapon names...")
+        weapon_names = []
+        try:
+            weapons = Weapon.query.all()
+            weapon_names = [w.hash_name for w in weapons]
+            print(f"✓ Backed up {len(weapon_names)} weapon names")
+        except Exception as e:
+            print(f"⚠ Could not backup weapons: {e}")
+        
+        # Step 2: Clear all tables (except weapon names)
+        print(f"\n[2/4] Clearing table data...")
+        
+        # Clear UserVote table
+        try:
+            deleted = db.session.query(UserVote).delete()
+            print(f"  ✓ Cleared {deleted} user votes")
+        except Exception as e:
+            print(f"  ⚠ Error clearing user votes: {e}")
+        
+        # Clear Team table
+        try:
+            deleted = db.session.query(Team).delete()
+            print(f"  ✓ Cleared {deleted} teams")
+        except Exception as e:
+            print(f"  ⚠ Error clearing teams: {e}")
+        
+        # Clear GameState table
+        try:
+            deleted = db.session.query(GameState).delete()
+            print(f"  ✓ Cleared {deleted} game states")
+        except Exception as e:
+            print(f"  ⚠ Error clearing game states: {e}")
+        
+        db.session.commit()
+        
+        # Step 2.5: Update weapon prices (instead of clearing)
+        print(f"\n[2.5/4] Updating weapon prices...")
+        update_weapon_prices()
+        
+        # Step 3: Initialize GameState
+        print("\n[3/4] Initializing game state...")
+        # 检查是否已存在GameState
+        game_state = GameState.query.filter_by(id=1).first()
+        if not game_state:
+            game_state = GameState(
+                id=1,
+                status=0,
+                total_prize_pool="0",
+                winning_team_id=None
+            )
+            db.session.add(game_state)
+            db.session.commit()
+            print("✓ Game state initialized")
+        else:
+            # 如果已存在，重置为初始状态
+            game_state.status = 0
+            game_state.total_prize_pool = "0"
+            game_state.winning_team_id = None
+            db.session.commit()
+            print("✓ Game state reset to initial state")
+        
+        # Step 4: Sync teams from contract
+        print("\n[4/4] Syncing teams from contract...")
+        try:
+            teams_data = contract.functions.getTeams().call()
+            print(f"Found {len(teams_data)} teams in contract")
+            
+            for team_data in teams_data:
+                team_id, name, total_vote, supporters = team_data
+                team = Team(
+                    id=int(team_id),
+                    name=name,
+                    total_vote_amount="0",
+                    supporter_count=0
+                )
+                db.session.add(team)
+                print(f"  - Added team: {name} (ID: {team_id})")
+            
+            db.session.commit()
+            print("✓ Teams synced successfully")
+            
+        except Exception as e:
+            print(f"✗ Error syncing teams: {e}")
+            db.session.rollback()
+    
+    print("\n" + "=" * 60)
+    print("✅ DATABASE RESET COMPLETE!")
+    print("=" * 60)
+
 if __name__ == '__main__':
     # 在运行 app 之前，确保 instance 文件夹存在
     instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
@@ -606,10 +832,13 @@ if __name__ == '__main__':
     # 初始化数据库
     with app.app_context():
         db.create_all()
-        print("✅ Database initialized")
+        print("✅ Database tables created")
+        
+        # 🔥 每次启动时自动重置数据库
+        auto_reset_database()
         
         # 同步合约状态
-        print("🔄 Syncing contract data...")
+        print("\n🔄 Syncing contract data...")
         update_team_stats()
         update_game_status()
         
