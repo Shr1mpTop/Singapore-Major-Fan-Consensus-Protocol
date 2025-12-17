@@ -32,13 +32,13 @@ import { parseEther } from "viem";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatedNumber, SlotMachineNumber } from "@/components/AnimatedNumber";
 import { FunFactsSection } from "@/components/FunFactsSection";
-import { ViewYourBetsSection } from "@/components/ViewYourBetsSection"; // Import the new component
+import { ViewYourVotesSection } from "@/components/ViewYourVotesSection"; // Import the new component
 
-// Contract ABI - bet function
-const BET_ABI = [
+// Contract ABI - vote function
+const VOTE_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "_teamId", type: "uint256" }],
-    name: "bet",
+    name: "vote",
     outputs: [],
     stateMutability: "payable",
     type: "function",
@@ -51,10 +51,10 @@ const CONTRACT_ADDRESS: `0x${string}` = (process.env
   "0xb5c4bea741cea63b2151d719b2cca12e80e6c7e8") as `0x${string}`;
 
 function HeroSection({
-  onScrollToBetting,
+  onScrollToVoting,
   status,
 }: {
-  onScrollToBetting: () => void;
+  onScrollToVoting: () => void;
   status?: any;
 }) {
   const [windowSize, setWindowSize] = useState({ width: 1920, height: 1080 });
@@ -80,12 +80,12 @@ function HeroSection({
   }, []);
 
   const isContestEnded = status?.status === 2;
-  const buttonText = isContestEnded ? "View Results" : "Start Betting";
+  const buttonText = isContestEnded ? "View Results" : "Start Voting";
   const handleButtonClick = isContestEnded
     ? () => {
         window.location.href = "/withdraw";
       }
-    : onScrollToBetting;
+    : onScrollToVoting;
 
   return (
     <motion.section
@@ -153,7 +153,7 @@ function HeroSection({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.4 }}
         >
-          Champion Prediction Contest - Predict the winner, win prizes
+          Rally Behind Your Champions - Support Your Team, Share the Glory
         </motion.p>
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
@@ -226,9 +226,7 @@ function StatsSection({
   statusLoading: boolean;
 }) {
   const totalParticipants = stats?.total_unique_participants || 0;
-  const totalPrizePoolEth = status?.total_prize_pool_wei
-    ? parseFloat(status.total_prize_pool_wei) / 10 ** 18
-    : 0;
+  const totalPrizePoolEth = status?.total_prize_pool_eth || 0;
   const { data: ethPrice, isLoading: ethPriceLoading } = useEthPrice();
   const ethPriceValue = ethPrice ? parseFloat(ethPrice.price) : 0;
   const totalPrizePoolUsd = totalPrizePoolEth * ethPriceValue;
@@ -549,7 +547,7 @@ function StatsSection({
   );
 }
 
-function BettingSection({
+function VotingSection({
   teams,
   status,
   teamsLoading,
@@ -559,7 +557,7 @@ function BettingSection({
   teamsLoading: boolean;
 }) {
   const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
-  const [betAmount, setBetAmount] = useState("");
+  const [voteAmount, setVoteAmount] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const { address, isConnected } = useAccount();
   const queryClient = useQueryClient();
@@ -584,10 +582,10 @@ function BettingSection({
     ) {
       // Transaction successful - backend event listeners will automatically sync the on-chain data
       console.log(
-        "Bet transaction successful, backend will sync automatically via event listeners"
+        "Vote transaction successful, backend will sync automatically via event listeners"
       );
 
-      // Invalidate queries to refetch data after a successful bet
+      // Invalidate queries to refetch data after a successful vote
       // Add a delay to allow backend event listeners to process the transaction
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["teams"] });
@@ -595,24 +593,24 @@ function BettingSection({
         queryClient.invalidateQueries({ queryKey: ["status"] });
       }, 5000); // Wait 5 seconds for backend to sync
     }
-  }, [isSuccess, address, selectedTeam, betAmount, queryClient]);
+  }, [isSuccess, address, selectedTeam, voteAmount, queryClient]);
 
-  const handleBet = (e: React.FormEvent) => {
+  const handleVote = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedTeam && betAmount) {
+    if (selectedTeam && voteAmount) {
       writeContract({
         address: CONTRACT_ADDRESS,
-        abi: BET_ABI,
-        functionName: "bet",
+        abi: VOTE_ABI,
+        functionName: "vote",
         args: [BigInt(selectedTeam.id)],
-        value: parseEther(betAmount),
+        value: parseEther(voteAmount),
       });
     }
   };
 
   const handleOpenDialog = (team: any) => {
     setSelectedTeam(team);
-    setBetAmount("");
+    setVoteAmount("");
     reset();
     setIsOpen(true);
   };
@@ -626,7 +624,7 @@ function BettingSection({
 
   return (
     <motion.section
-      id="betting-section"
+      id="voting-section"
       className="py-24 px-4 relative z-10"
       initial={{ opacity: 0 }}
       whileInView={{ opacity: 1 }}
@@ -645,10 +643,10 @@ function BettingSection({
           viewport={{ once: true }}
         >
           <h2 className="text-6xl md:text-8xl font-black bg-gradient-to-r from-red-400 via-red-300 to-yellow-400 bg-clip-text text-transparent text-glow tracking-wider mb-4">
-            Place Your Bet
+            Place Your Vote
           </h2>
           <p className="text-xl text-red-200 max-w-2xl mx-auto">
-            Select a team to see their stats and place your bet. The prize pool
+            Select a team to see their stats and place your vote. The prize pool
             is distributed to the winners.
           </p>
           <motion.div
@@ -738,13 +736,13 @@ function BettingSection({
                         {team.name}
                       </CardTitle>
                       <p className="text-red-300">
-                        Prize Pool:{" "}
+                        Total Votes:{" "}
                         <span className="font-semibold text-yellow-300">
-                          {(team.prize_pool_eth ?? 0).toFixed(4)} ETH
+                          {(team.total_vote_amount_eth ?? 0).toFixed(4)} ETH
                         </span>
                       </p>
                       <p className="text-sm text-red-400 mt-1">
-                        {team.bets_count} Bets
+                        {team.supporter_count} Supporters
                       </p>
                     </CardContent>
                   </Card>
@@ -753,7 +751,7 @@ function BettingSection({
         </div>
       </div>
 
-      {/* Betting Dialog */}
+      {/* Voting Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="glass-red text-white border-red-500/50">
           <DialogHeader>
@@ -766,10 +764,10 @@ function BettingSection({
                 />
                 <div>
                   <DialogTitle className="text-3xl font-bold text-red-100">
-                    Bet on {selectedTeam.name}
+                    Vote for {selectedTeam.name}
                   </DialogTitle>
                   <DialogDescription className="text-red-300">
-                    Your bet will be added to this team's prize pool.
+                    Your vote will be added to this team's prize pool.
                   </DialogDescription>
                 </div>
               </div>
@@ -777,21 +775,21 @@ function BettingSection({
           </DialogHeader>
 
           {!isSuccess && !isConfirming && !isPending && (
-            <form onSubmit={handleBet} className="space-y-6">
+            <form onSubmit={handleVote} className="space-y-6">
               <div>
                 <label
-                  htmlFor="betAmount"
+                  htmlFor="voteAmount"
                   className="block text-sm font-medium text-red-200 mb-2"
                 >
-                  Bet Amount (ETH)
+                  Vote Amount (ETH)
                 </label>
                 <Input
-                  id="betAmount"
+                  id="voteAmount"
                   type="number"
                   step="0.001"
                   min="0.001"
-                  value={betAmount}
-                  onChange={(e) => setBetAmount(e.target.value)}
+                  value={voteAmount}
+                  onChange={(e) => setVoteAmount(e.target.value)}
                   className="bg-red-900/50 border-red-500/50 text-white placeholder-red-400 focus:ring-red-400"
                   placeholder="e.g., 0.01"
                   required
@@ -802,14 +800,14 @@ function BettingSection({
                 <Button
                   type="submit"
                   className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 text-lg glow-hover border border-red-400/50"
-                  disabled={isPending || !betAmount}
+                  disabled={isPending || !voteAmount}
                 >
-                  {isPending ? "Waiting for wallet..." : `Place Bet`}
+                  {isPending ? "Waiting for wallet..." : `Place Vote`}
                 </Button>
               ) : (
                 <div className="text-center p-4 bg-red-900/50 rounded-lg">
                   <p className="font-semibold text-yellow-300">
-                    Please connect your wallet to bet.
+                    Please connect your wallet to vote.
                   </p>
                 </div>
               )}
@@ -873,14 +871,14 @@ function BettingSection({
                 </svg>
               </motion.div>
               <p className="text-2xl font-bold text-green-300">
-                Bet Placed Successfully!
+                Vote Placed Successfully!
               </p>
               <p className="text-red-200">
-                You have successfully bet{" "}
+                You have successfully voted{" "}
                 <span className="font-bold text-yellow-300">
-                  {betAmount} ETH
+                  {voteAmount} ETH
                 </span>{" "}
-                on{" "}
+                for{" "}
                 <span className="font-bold text-yellow-300">
                   {selectedTeam?.name}
                 </span>
@@ -915,57 +913,35 @@ function MainContent() {
   const { data: status, isLoading: statusLoading } = useStatus();
   const { data: stats, isLoading: statsLoading } = useStats();
 
-  const bettingSectionRef = useRef<HTMLDivElement>(null);
+  const votingSectionRef = useRef<HTMLDivElement>(null);
 
-  const handleScrollToBetting = () => {
-    bettingSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+  const handleScrollToVoting = () => {
+    votingSectionRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
     <>
-      <HeroSection onScrollToBetting={handleScrollToBetting} status={status} />
+      <HeroSection onScrollToVoting={handleScrollToVoting} status={status} />
       <StatsSection
         stats={stats}
         status={status}
         statsLoading={statsLoading}
         statusLoading={statusLoading}
       />
-      <div ref={bettingSectionRef}>
-        <BettingSection
+      <div ref={votingSectionRef}>
+        <VotingSection
           teams={teams || []}
           status={status}
           teamsLoading={teamsLoading}
         />
       </div>
-      <ViewYourBetsSection />
+      <ViewYourVotesSection />
       <FunFactsSection />
     </>
   );
 }
 
 export default function Home() {
-  const [currentSection, setCurrentSection] = useState(0);
-  const { scrollY } = useScroll();
-  const { data: status, isLoading: statusLoading } = useStatus();
-  const { data: teams, isLoading: teamsLoading } = useTeams();
-  const { data: stats, isLoading: statsLoading } = useStats();
-
-  // 监听滚动位置来切换页面状态
-  useEffect(() => {
-    const unsubscribe = scrollY.onChange((value) => {
-      const sectionHeight = window.innerHeight;
-      const newSection = Math.floor(value / sectionHeight);
-      setCurrentSection(Math.min(newSection, 4)); // 现在有5个section，最大索引为4
-    });
-
-    return unsubscribe;
-  }, [scrollY]);
-
-  const scrollToBetting = () => {
-    const bettingSection = document.getElementById("betting-section");
-    bettingSection?.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
     <div className="bg-red-gradient text-white relative overflow-x-hidden">
       {/* 背景图片 */}
@@ -992,63 +968,6 @@ export default function Home() {
         ></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-radial from-red-500/3 to-transparent rounded-full blur-3xl"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-red-500/5 to-transparent rounded-full blur-3xl"></div>
-
-        {/* 几何形状装饰 */}
-        <motion.div
-          className="absolute top-20 left-10 w-32 h-32 border border-red-500/20 rounded-full"
-          animate={{
-            rotate: 360,
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            rotate: { duration: 20, repeat: Infinity, ease: "linear" },
-            scale: { duration: 4, repeat: Infinity, ease: "easeInOut" },
-          }}
-        />
-        <motion.div
-          className="absolute bottom-20 right-10 w-24 h-24 border border-yellow-500/20 rounded-lg rotate-45"
-          animate={{
-            rotate: [45, 135, 45],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            rotate: { duration: 15, repeat: Infinity, ease: "easeInOut" },
-            scale: {
-              duration: 5,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: 1,
-            },
-          }}
-        />
-
-        {/* 浮动光点 */}
-        <motion.div
-          className="absolute top-1/3 right-1/4 w-4 h-4 bg-red-400/30 rounded-full blur-sm"
-          animate={{
-            y: [0, -20, 0],
-            opacity: [0.3, 0.8, 0.3],
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.5,
-          }}
-        />
-        <motion.div
-          className="absolute bottom-1/3 left-1/4 w-6 h-6 bg-yellow-400/20 rounded-full blur-sm"
-          animate={{
-            y: [0, 20, 0],
-            opacity: [0.2, 0.6, 0.2],
-          }}
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 1.5,
-          }}
-        />
       </div>
 
       {/* 固定右上角钱包连接 */}
@@ -1063,57 +982,8 @@ export default function Home() {
 
       {/* 页面内容 */}
       <div className="relative z-10">
-        <HeroSection onScrollToBetting={scrollToBetting} status={status} />
-        <StatsSection
-          stats={stats}
-          status={status}
-          statsLoading={statsLoading}
-          statusLoading={statusLoading}
-        />
-        <div id="betting-section">
-          <BettingSection
-            teams={teams || []}
-            status={status}
-            teamsLoading={teamsLoading}
-          />
-        </div>
-        <ViewYourBetsSection />
-        <FunFactsSection />
+        <MainContent />
       </div>
-
-      {/* 页面指示器 */}
-      <motion.div
-        className="fixed left-4 top-1/2 transform -translate-y-1/2 z-40"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 1.5 }}
-      >
-        <div className="flex flex-col space-y-2">
-          {(() => {
-            const sections = [
-              "hero-section",
-              "stats-section",
-              "betting-section",
-              "your-bets-section",
-              "fun-facts-section",
-            ];
-            return sections.map((sectionId, index) => (
-              <motion.div
-                key={index}
-                className={`w-3 h-3 rounded-full cursor-pointer transition-all duration-300 ${
-                  currentSection === index ? "bg-red-400 glow" : "bg-red-600/50"
-                }`}
-                whileHover={{ scale: 1.2 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => {
-                  const element = document.getElementById(sectionId);
-                  element?.scrollIntoView({ behavior: "smooth" });
-                }}
-              />
-            ));
-          })()}
-        </div>
-      </motion.div>
     </div>
   );
 }

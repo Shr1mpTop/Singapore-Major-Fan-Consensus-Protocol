@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CS2 Major Betting DApp",
+  title: "CS2 Major Fan Consensus Protocol",
   description: "Predict the winner of CS2 Singapore Major 2026",
 };
 

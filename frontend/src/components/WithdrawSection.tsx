@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 
-// 合约ABI - withdraw函数和userBets函数
+// 合约ABI - withdraw函数和userVotes函数
 const CONTRACT_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "_teamId", type: "uint256" }],
@@ -40,7 +40,7 @@ const CONTRACT_ABI = [
       { internalType: "address", name: "", type: "address" },
       { internalType: "uint256", name: "", type: "uint256" },
     ],
-    name: "userBets",
+    name: "userVotes",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
@@ -52,25 +52,23 @@ const CONTRACT_ADDRESS: `0x${string}` = (process.env
   .NEXT_PUBLIC_CONTRACT_ADDRESS ||
   "0xb5c4bea741cea63b2151d719b2cca12e80e6c7e8") as `0x${string}`;
 
-interface BettingHistory {
-  total_bets: number;
+interface VotingHistory {
+  total_votes: number;
   total_invested_eth: number;
   total_returned_eth: number;
-  net_profit_eth: number;
-  game_status: number;
-  winning_team_id: number | null;
-  bets: {
+  total_profit_eth: number; // 后端返回的字段名
+  win_rate?: number;
+  votes: {
     team_id: number;
     team_name: string;
-    bet_amount_eth: number;
-    returned_amount_eth: number;
-    profit_loss_eth: number;
+    amount_eth: number; // 后端字段
+    payout_eth: number; // 后端字段
     status: string;
     timestamp: string | null;
   }[];
 }
 
-interface UserBet {
+interface UserVote {
   team_id: number;
   amount_wei: string;
   amount_eth: number;
@@ -84,140 +82,65 @@ export function WithdrawSection() {
   const [withdrawingTeam, setWithdrawingTeam] = useState<number | null>(null);
 
   // Create an array to store contract calls for all teams
-  const userBetCalls = [];
+  const userVoteCalls = [];
 
   if (teams && address && isConnected) {
     // Properly handle the readonly array type
     const teamsData = Array.isArray(teams) ? [...teams] : [];
 
     for (const team of teamsData) {
-      userBetCalls.push({
+      userVoteCalls.push({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
-        functionName: "userBets" as const,
+        functionName: "userVotes" as const,
         args: [address as `0x${string}`, BigInt(team.id)],
       });
     }
   }
 
-  // Get user's betting history and profit/loss calculation
-  const { data: bettingHistory, isLoading: historyLoading } = useQuery({
-    queryKey: ["bettingHistory", address],
+  // Get user's voting history and profit/loss calculation
+  const { data: votingHistory, isLoading: historyLoading } = useQuery({
+    queryKey: ["votingHistory", address],
     queryFn: async () => {
       if (!address) return null;
 
-      // Get contract bets
-      const contractResponse = await axios.get(
+      // Use the voting_history endpoint which returns all the data we need
+      const response = await axios.get(
         `${
           process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5001/api"
-        }/user_contract_bets/${address}`
+        }/voting_history/${address}`
       );
-      const contractBets = contractResponse.data.bets || [];
 
-      // Get game state and teams info
-      const [statusRes, teamsRes, statsRes] = await Promise.all([
-        axios.get(
-          `${
-            process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5001/api"
-          }/status`
-        ),
-        axios.get(
-          `${
-            process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5001/api"
-          }/historical_team_stats` // 使用历史数据而不是当前合约数据
-        ),
-        axios.get(
-          `${
-            process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5001/api"
-          }/stats`
-        ),
-      ]);
-
-      const gameStatus = statusRes.data;
-      const teams = teamsRes.data.teams || [];
-      const stats = statsRes.data;
-
-      // Calculate profits
-      let totalInvested = 0;
-      let totalReturned = 0;
-      const betHistory = [];
-
-      for (const bet of contractBets) {
-        totalInvested += bet.amount_eth;
-
-        let returnedAmount = 0;
-        let profitLoss = -bet.amount_eth;
-        let status = "Lost";
-
-        if (gameStatus.status === 2) {
-          // Finished
-          if (bet.team_id === gameStatus.winning_team_id) {
-            // Find winner team total
-            const winnerTeam = teams.find(
-              (t: any) => t.id === gameStatus.winning_team_id
-            );
-            if (winnerTeam && winnerTeam.prize_pool_eth > 0) {
-              const distributablePrize = stats.total_prize_pool_eth * 0.9;
-              returnedAmount =
-                (bet.amount_eth / winnerTeam.prize_pool_eth) *
-                distributablePrize;
-              profitLoss = returnedAmount - bet.amount_eth;
-              status = "Won";
-              totalReturned += returnedAmount;
-            }
-          }
-        }
-
-        betHistory.push({
-          team_id: bet.team_id,
-          team_name: bet.team_name,
-          bet_amount_eth: bet.amount_eth,
-          returned_amount_eth: returnedAmount,
-          profit_loss_eth: profitLoss,
-          status: status,
-          source: "contract",
-        });
-      }
-
-      return {
-        total_bets: contractBets.length,
-        total_invested_eth: totalInvested,
-        total_returned_eth: totalReturned,
-        net_profit_eth: totalReturned - totalInvested,
-        game_status: gameStatus.status,
-        winning_team_id: gameStatus.winning_team_id,
-        bets: betHistory,
-      };
+      return response.data;
     },
     enabled: !!address,
-    refetchInterval: 10000, // Refresh every 10 seconds
+    refetchInterval: 5000,
   });
 
-  // Get user's betting records from contract (for withdrawal)
-  const { data: userBetResults, isLoading: contractLoading } = useReadContracts(
-    {
-      contracts: userBetCalls,
+  // Get user's voting records from contract (for withdrawal)
+  const { data: userVoteResults, isLoading: contractLoading } =
+    useReadContracts({
+      contracts: userVoteCalls,
       query: {
-        enabled: !!address && isConnected && userBetCalls.length > 0,
+        enabled: !!address && isConnected && userVoteCalls.length > 0,
       },
-    }
-  );
+    });
 
-  // Process the results into user bets (for withdrawal)
-  const userBets: UserBet[] = [];
+  // Process the results into user votes (for withdrawal)
+  const userVotes: UserVote[] = [];
 
-  if (userBetResults && teams && address && isConnected) {
+  if (userVoteResults && teams && address && isConnected) {
     const teamsData = Array.isArray(teams) ? [...teams] : [];
 
     for (let i = 0; i < teamsData.length; i++) {
       const team = teamsData[i];
-      const betAmount = userBetResults[i]?.result || BigInt(0);
+      const voteAmount = userVoteResults[i]?.result || BigInt(0);
 
-      if (betAmount > 0) {
-        userBets.push({
+      if (voteAmount > 0) {
+        userVotes.push({
           team_id: team.id,
-          amount_wei: betAmount.toString(),
-          amount_eth: Number(betAmount) / 1e18,
+          amount_wei: voteAmount.toString(),
+          amount_eth: Number(voteAmount) / 1e18,
         });
       }
     }
@@ -234,28 +157,10 @@ export function WithdrawSection() {
     hash,
   });
 
-  // 计算用户最终可以体现的金额
-  const calculateWithdrawableAmount = (bet: UserBet) => {
-    if (!status || !stats || !teams) return 0;
-
-    if (status.status === 3) {
-      // Refunding - 全额退款
-      return bet.amount_eth;
-    } else if (status.status === 2) {
-      // Finished - 奖金计算
-      if (bet.team_id === status.winning_team_id) {
-        // 找到冠军队伍的总下注额
-        const winnerTeam = teams.find(
-          (team) => team.id === status.winning_team_id
-        );
-        if (winnerTeam) {
-          const totalDistributable = stats.total_prize_pool_eth * 0.9; // 扣除10%公益金
-          const winnerTotalBet = winnerTeam.prize_pool_eth;
-          return (bet.amount_eth / winnerTotalBet) * totalDistributable;
-        }
-      }
-    }
-    return 0;
+  // 使用后端返回的payout_eth作为可提现金额
+  const calculateWithdrawableAmount = (vote: any) => {
+    // 后端已经计算好了payout_eth
+    return vote.payout_eth || 0;
   };
 
   // 检查用户是否是赢家
@@ -299,8 +204,9 @@ export function WithdrawSection() {
 
   // Check if withdrawal is allowed
   const canWithdraw = status?.status === 2 || status?.status === 3; // Finished or Refunding
-  const hasWithdrawableBets =
-    userBets && userBets.some((bet) => calculateWithdrawableAmount(bet) > 0);
+  const hasWithdrawableVotes =
+    votingHistory?.votes &&
+    votingHistory.votes.some((vote) => calculateWithdrawableAmount(vote) > 0);
 
   if (!address) {
     return (
@@ -313,7 +219,7 @@ export function WithdrawSection() {
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-red-100 flex items-center justify-center gap-3">
               <Wallet className="w-8 h-8 text-red-400" />
-              Withdraw Prize
+              Collect Rewards
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -326,10 +232,10 @@ export function WithdrawSection() {
                 🔗
               </motion.div>
               <p className="text-red-200 text-lg font-medium">
-                Please connect your wallet first
+                Connect your wallet to continue
               </p>
               <p className="text-red-300 text-sm mt-2">
-                Connect your wallet to view your betting history and withdraw
+                Connect your wallet to view your voting history and withdraw
                 prizes
               </p>
             </div>
@@ -350,7 +256,7 @@ export function WithdrawSection() {
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-red-100 flex items-center justify-center gap-3">
               <Trophy className="w-8 h-8 text-red-400" />
-              Withdraw Prize
+              Rewards Distribution
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -363,10 +269,10 @@ export function WithdrawSection() {
                 ⏳
               </motion.div>
               <p className="text-red-200 text-lg font-medium mb-2">
-                Current game status: {status?.status_text || "Unknown"}
+                Current status: {status?.status_text || "Unknown"}
               </p>
               <p className="text-red-300 text-sm">
-                You can only withdraw prizes after the match ends
+                Rewards unlock when champions are crowned
               </p>
               <div className="mt-4 p-3 bg-red-900/20 rounded-lg border border-red-500/20">
                 <p className="text-yellow-400 text-sm">
@@ -404,7 +310,7 @@ export function WithdrawSection() {
               <Trophy className="w-8 h-8 text-white" />
             </div>
             <CardTitle className="text-3xl font-bold text-white">
-              Prize Pool
+              Victory Vault
             </CardTitle>
           </motion.div>
         </CardHeader>
@@ -544,8 +450,8 @@ export function WithdrawSection() {
             </motion.div>
           )}
 
-          {/* Betting History Summary */}
-          {bettingHistory && (
+          {/* Voting History Summary */}
+          {votingHistory && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -555,7 +461,7 @@ export function WithdrawSection() {
               <div className="flex items-center justify-center gap-3 mb-6">
                 <Target className="w-6 h-6 text-red-400" />
                 <h3 className="text-xl font-bold text-red-100">
-                  Your Betting Summary
+                  Your Voting Summary
                 </h3>
               </div>
 
@@ -565,10 +471,10 @@ export function WithdrawSection() {
                   className="text-center p-4 bg-red-900/6 rounded-xl border border-red-700/25"
                 >
                   <p className="text-red-300 text-sm font-medium mb-2">
-                    Total Bets
+                    Total Votes
                   </p>
                   <p className="text-2xl font-bold text-yellow-400">
-                    <AnimatedNumber value={bettingHistory.total_bets} />
+                    <AnimatedNumber value={votingHistory.total_votes} />
                   </p>
                 </motion.div>
 
@@ -577,11 +483,11 @@ export function WithdrawSection() {
                   className="text-center p-4 bg-red-900/6 rounded-xl border border-red-700/25"
                 >
                   <p className="text-red-300 text-sm font-medium mb-2">
-                    Total Invested
+                    Total Staked
                   </p>
                   <p className="text-2xl font-bold text-white">
                     <AnimatedNumber
-                      value={bettingHistory.total_invested_eth}
+                      value={votingHistory.total_invested_eth}
                       decimals={4}
                     />
                     <span className="text-red-300 ml-1 text-lg">ETH</span>
@@ -597,7 +503,7 @@ export function WithdrawSection() {
                   </p>
                   <p className="text-2xl font-bold text-red-300">
                     <AnimatedNumber
-                      value={bettingHistory.total_returned_eth}
+                      value={votingHistory.total_returned_eth}
                       decimals={4}
                     />
                     <span className="text-red-300 ml-1 text-lg">ETH</span>
@@ -607,14 +513,14 @@ export function WithdrawSection() {
                 <motion.div
                   whileHover={{ scale: 1.05 }}
                   className={`text-center p-4 rounded-xl border ${
-                    bettingHistory.net_profit_eth >= 0
+                    votingHistory.net_profit_eth >= 0
                       ? "bg-red-900/6 border-green-500/20"
                       : "bg-red-900/6 border-red-500/30"
                   }`}
                 >
                   <p
                     className={`text-sm font-medium mb-2 ${
-                      bettingHistory.net_profit_eth >= 0
+                      votingHistory.total_profit_eth >= 0
                         ? "text-green-300"
                         : "text-red-300"
                     }`}
@@ -623,19 +529,19 @@ export function WithdrawSection() {
                   </p>
                   <p
                     className={`text-2xl font-bold ${
-                      bettingHistory.net_profit_eth >= 0
+                      votingHistory.total_profit_eth >= 0
                         ? "text-green-400"
                         : "text-red-400"
                     }`}
                   >
-                    {bettingHistory.net_profit_eth >= 0 ? "+" : ""}
+                    {votingHistory.total_profit_eth >= 0 ? "+" : ""}
                     <AnimatedNumber
-                      value={bettingHistory.net_profit_eth}
+                      value={votingHistory.total_profit_eth}
                       decimals={4}
                     />
                     <span
                       className={`ml-1 text-lg ${
-                        bettingHistory.net_profit_eth >= 0
+                        votingHistory.total_profit_eth >= 0
                           ? "text-green-300"
                           : "text-red-300"
                       }`}
@@ -648,8 +554,8 @@ export function WithdrawSection() {
             </motion.div>
           )}
 
-          {/* Betting History Details */}
-          {bettingHistory && bettingHistory.bets.length > 0 && (
+          {/* Voting History Details */}
+          {votingHistory && votingHistory.votes.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -659,13 +565,13 @@ export function WithdrawSection() {
               <div className="flex items-center justify-center gap-3 mb-6">
                 <Wallet className="w-6 h-6 text-red-400" />
                 <h3 className="text-xl font-bold text-red-100">
-                  Betting History
+                  Voting History
                 </h3>
               </div>
 
               <div className="space-y-3">
                 <AnimatePresence>
-                  {bettingHistory.bets.map((bet, index) => (
+                  {votingHistory.votes.map((vote, index) => (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0, x: -20 }}
@@ -673,7 +579,7 @@ export function WithdrawSection() {
                       transition={{ delay: 1.2 + index * 0.1, duration: 0.5 }}
                       whileHover={{ scale: 1.02 }}
                       className={`p-4 rounded-xl border bg-red-900/6 transition-all duration-200 ${
-                        bet.status === "Won"
+                        vote.status === "Won"
                           ? "border-green-500/20"
                           : "border-red-500/30"
                       }`}
@@ -682,12 +588,12 @@ export function WithdrawSection() {
                         <div className="flex items-center gap-4">
                           <div
                             className={`p-2 rounded-full ${
-                              bet.status === "Won"
+                              vote.status === "Won"
                                 ? "bg-green-500/20"
                                 : "bg-red-500/20"
                             }`}
                           >
-                            {bet.status === "Won" ? (
+                            {vote.status === "Won" ? (
                               <TrendingUp className="w-5 h-5 text-green-400" />
                             ) : (
                               <TrendingDown className="w-5 h-5 text-red-400" />
@@ -695,13 +601,13 @@ export function WithdrawSection() {
                           </div>
                           <div>
                             <p className="text-lg font-bold text-white">
-                              {bet.team_name}
+                              {vote.team_name}
                             </p>
                             <p className="text-sm text-gray-300">
-                              Bet:{" "}
+                              Staked:{" "}
                               <span className="text-blue-400 font-semibold">
                                 <AnimatedNumber
-                                  value={bet.bet_amount_eth}
+                                  value={vote.amount_eth}
                                   decimals={4}
                                 />{" "}
                                 ETH
@@ -713,19 +619,19 @@ export function WithdrawSection() {
                         <div className="text-right">
                           <div
                             className={`text-sm font-medium px-3 py-1 rounded-full ${
-                              bet.status === "Won"
+                              vote.status === "Won"
                                 ? "bg-green-800/10 text-green-300"
                                 : "bg-red-800/10 text-red-300"
                             }`}
                           >
-                            {bet.status}
+                            {vote.status}
                           </div>
                           <div className="mt-2 space-y-1">
                             <p className="text-sm text-gray-300">
                               Returned:{" "}
                               <span className="text-green-400 font-semibold">
                                 <AnimatedNumber
-                                  value={bet.returned_amount_eth}
+                                  value={vote.payout_eth}
                                   decimals={4}
                                 />{" "}
                                 ETH
@@ -733,14 +639,17 @@ export function WithdrawSection() {
                             </p>
                             <p
                               className={`text-sm font-semibold ${
-                                bet.profit_loss_eth >= 0
+                                vote.payout_eth - vote.amount_eth >= 0
                                   ? "text-green-400"
                                   : "text-red-400"
                               }`}
                             >
-                              P/L: {bet.profit_loss_eth >= 0 ? "+" : ""}
+                              P/L:{" "}
+                              {vote.payout_eth - vote.amount_eth >= 0
+                                ? "+"
+                                : ""}
                               <AnimatedNumber
-                                value={bet.profit_loss_eth}
+                                value={vote.payout_eth - vote.amount_eth}
                                 decimals={4}
                               />{" "}
                               ETH
@@ -763,8 +672,8 @@ export function WithdrawSection() {
               className="text-center py-12"
             >
               <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ repeat: Infinity, duration: 1.5 }}
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
                 className="text-6xl mb-4"
               >
                 🎰
@@ -774,27 +683,31 @@ export function WithdrawSection() {
                 transition={{ repeat: Infinity, duration: 2 }}
                 className="text-red-200 text-lg font-medium"
               >
-                Loading betting history...
+                Gathering your support records...
               </motion.p>
-              <p className="text-red-300 text-sm mt-2">
-                Fetching your data from the blockchain
-              </p>
+              <motion.p
+                className="text-red-300 text-sm mt-2"
+                animate={{ opacity: [0.5, 1, 0.5] }}
+                transition={{ repeat: Infinity, duration: 2, delay: 0.5 }}
+              >
+                Syncing with the blockchain
+              </motion.p>
             </motion.div>
-          ) : !hasWithdrawableBets ? (
-            <p className="text-red-200">You have no funds to withdraw</p>
+          ) : !hasWithdrawableVotes ? (
+            <p className="text-red-200">
+              No rewards available for collection yet
+            </p>
           ) : (
-            userBets
-              .filter((bet) => calculateWithdrawableAmount(bet) > 0)
-              .map((bet) => {
-                const withdrawableAmount = calculateWithdrawableAmount(bet);
-                const isUserWinner = isWinner(bet.team_id);
-                const teamName =
-                  teams?.find((t) => t.id === bet.team_id)?.name ||
-                  `Team ${bet.team_id}`;
+            votingHistory?.votes
+              ?.filter((vote) => calculateWithdrawableAmount(vote) > 0)
+              .map((vote) => {
+                const withdrawableAmount = calculateWithdrawableAmount(vote);
+                const isUserWinner = isWinner(vote.team_id);
+                const teamName = vote.team_name || `Team ${vote.team_id}`;
 
                 return (
                   <div
-                    key={bet.team_id}
+                    key={vote.team_id}
                     className="bg-red-900/30 p-4 rounded-lg border border-red-500/20"
                   >
                     <div className="flex items-center justify-between mb-3">
@@ -813,7 +726,7 @@ export function WithdrawSection() {
                           )}
                         </p>
                         <p className="text-red-200 text-sm">
-                          Your Bet: {bet.amount_eth.toFixed(4)} ETH
+                          Your Vote: {vote.amount_eth.toFixed(4)} ETH
                         </p>
                       </div>
                       <div className="text-right">
@@ -823,7 +736,7 @@ export function WithdrawSection() {
                         {status?.status === 2 && isUserWinner && (
                           <p className="text-green-400 text-xs">
                             Prize Multiplier:{" "}
-                            {(withdrawableAmount / bet.amount_eth).toFixed(2)}x
+                            {(withdrawableAmount / vote.amount_eth).toFixed(2)}x
                           </p>
                         )}
                       </div>
@@ -831,8 +744,8 @@ export function WithdrawSection() {
 
                     {status?.status === 2 && isUserWinner && (
                       <div className="text-xs text-red-300 mb-3 p-2 bg-red-900/50 rounded">
-                        💰 Prize Calculation: (Your Bet ÷ Winner Team Total Bet)
-                        × Distributable Prize Pool
+                        💰 Prize Calculation: (Your Vote ÷ Winner Team Total
+                        Votes) × Distributable Prize Pool
                       </div>
                     )}
 
@@ -841,20 +754,20 @@ export function WithdrawSection() {
                       whileTap={{ scale: 0.98 }}
                     >
                       <Button
-                        onClick={() => handleWithdraw(bet.team_id)}
-                        disabled={isPending || withdrawingTeam === bet.team_id}
+                        onClick={() => handleWithdraw(vote.team_id)}
+                        disabled={isPending || withdrawingTeam === vote.team_id}
                         className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 rounded-xl shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <motion.div
                           className="flex items-center justify-center gap-2"
                           animate={
-                            withdrawingTeam === bet.team_id
+                            withdrawingTeam === vote.team_id
                               ? { scale: [1, 1.1, 1] }
                               : {}
                           }
                           transition={{ repeat: Infinity, duration: 1.5 }}
                         >
-                          {withdrawingTeam === bet.team_id ? (
+                          {withdrawingTeam === vote.team_id ? (
                             <>
                               <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
                               Processing...
@@ -863,8 +776,8 @@ export function WithdrawSection() {
                             <>
                               <Star className="w-4 h-4" />
                               {status?.status === 3
-                                ? "Confirm Refund"
-                                : "Withdraw Prize"}
+                                ? "Collect Refund"
+                                : "Claim Victory Reward"}
                             </>
                           )}
                         </motion.div>
@@ -939,9 +852,9 @@ export function WithdrawSection() {
           </AnimatePresence>
 
           {/* No Funds Message */}
-          {hasWithdrawableBets === false &&
-            bettingHistory &&
-            bettingHistory.bets.length > 0 && (
+          {hasWithdrawableVotes === false &&
+            votingHistory &&
+            votingHistory.votes.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -950,7 +863,7 @@ export function WithdrawSection() {
                 <div className="flex items-center justify-center gap-2 text-gray-400">
                   <Wallet className="w-5 h-5" />
                   <span className="font-medium">
-                    You have no funds to withdraw
+                    No rewards available for collection yet
                   </span>
                 </div>
               </motion.div>

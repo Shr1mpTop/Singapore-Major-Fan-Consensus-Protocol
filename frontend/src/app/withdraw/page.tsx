@@ -97,12 +97,12 @@ export default function WithdrawPage() {
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-6xl md:text-8xl font-black bg-gradient-to-r from-red-400 via-red-300 to-yellow-400 bg-clip-text text-transparent text-glow tracking-wider mb-4">
-              {status.status === 2 ? "Claim Your Prize" : "Get Your Refund"}
+              {status.status === 2 ? "Victory Celebration" : "Safe Return"}
             </h1>
             <p className="text-xl text-red-200 max-w-2xl mx-auto">
               {status.status === 2
-                ? "Congratulations! Claim your winnings from the prize pool."
-                : "Get your full refund for all your bets."}
+                ? "Your champion prevailed! Collect your share of glory."
+                : "All contributions returned safely to supporters."}
             </p>
             <motion.div
               className="w-40 h-2 bg-gradient-to-r from-red-500 to-yellow-500 mx-auto rounded-full mt-6"
@@ -125,8 +125,10 @@ export default function WithdrawPage() {
                   Connect Your Wallet
                 </h2>
                 <p className="text-red-300 mb-6">
-                  Please connect your wallet to{" "}
-                  {status.status === 2 ? "claim your prize" : "get your refund"}
+                  Connect your wallet to{" "}
+                  {status.status === 2
+                    ? "collect your rewards"
+                    : "receive your contribution back"}
                   .
                 </p>
                 <ConnectButton />

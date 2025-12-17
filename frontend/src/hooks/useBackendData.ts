@@ -31,7 +31,7 @@ const STATUS_ABI = [
 export interface StatusData {
   status: number;
   status_text: string;
-  total_prize_pool_wei: string;
+  total_prize_pool_eth: number;
   winning_team_id: number;
 }
 
@@ -39,15 +39,13 @@ export interface TeamData {
   id: number;
   name: string;
   logo_url: string;
-  prize_pool_eth: number;
-  bets_count: number;
-  is_winner: boolean;
+  total_vote_amount_eth: number;
+  supporter_count: number;
 }
 
 export interface StatsData {
   total_unique_participants: number;
-  total_bets: number;
-  total_prize_pool_wei: string;
+  total_votes: number;
   total_prize_pool_eth: number;
   weapon_equivalents: {
     name: string;
@@ -59,11 +57,8 @@ export interface StatsData {
   }[];
 }
 
-export interface LeaderboardData {
-  rank: number;
-  address: string;
-  total_bet_eth: number;
-}
+// The LeaderboardData interface and useLeaderboard hook have been removed
+// as they are not used in the new backend version.
 
 export function useStats() {
   return useQuery<StatsData>({
@@ -151,16 +146,7 @@ export function useTeams() {
   });
 }
 
-export function useLeaderboard() {
-  return useQuery<LeaderboardData[]>({
-    queryKey: ["leaderboard"],
-    queryFn: async () => {
-      const response = await axios.get(`${API_BASE_URL}/leaderboard`);
-      return response.data;
-    },
-    refetchInterval: 5000, // Refresh every 5 seconds
-  });
-}
+// The useLeaderboard hook has been removed.
 
 export interface EthPriceData {
   symbol: string;
@@ -213,5 +199,40 @@ export function useEthPrice() {
     refetchInterval: 10000, // Refresh every 10 seconds for price data
     retry: 1, // 减少重试次数，因为我们有备用API
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // 指数退避
+  });
+}
+
+export interface UserVote {
+  team_id: number;
+  team_name: string;
+  amount_eth: number;
+  status: "Pending" | "Won" | "Lost" | "Refunded";
+  payout_eth: number;
+  timestamp: string | null;
+}
+
+export interface UserVotingHistoryData {
+  total_votes: number;
+  total_invested_eth: number;
+  total_returned_eth: number;
+  total_profit_eth: number;
+  win_rate?: number;
+  votes: UserVote[];
+}
+
+export function useUserVotingHistory(userAddress: string | undefined) {
+  return useQuery<UserVotingHistoryData>({
+    queryKey: ["userVotingHistory", userAddress],
+    queryFn: async () => {
+      if (!userAddress) {
+        throw new Error("User address is required");
+      }
+      const response = await axios.get(
+        `${API_BASE_URL}/voting_history/${userAddress}`
+      );
+      return response.data;
+    },
+    enabled: !!userAddress, // Only run query if userAddress exists
+    refetchInterval: 5000, // Refresh every 5 seconds
   });
 }

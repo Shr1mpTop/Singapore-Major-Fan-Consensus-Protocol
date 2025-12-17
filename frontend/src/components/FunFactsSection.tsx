@@ -1,6 +1,6 @@
 "use client";
 
-import { useStats, useLeaderboard } from "@/hooks/useBackendData";
+import { useStats } from "@/hooks/useBackendData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,7 +22,26 @@ const rankIcons: { [key: number]: string } = {
 
 export function FunFactsSection() {
   const { data: stats, isLoading: statsLoading } = useStats();
-  const { data: leaderboard, isLoading: leaderboardLoading } = useLeaderboard();
+  const funFacts = [
+    {
+      title: "Equivalent in CS2 Skins",
+      value: stats?.weapon_equivalents[0]?.name,
+      description: `The prize pool could buy ~${
+        stats?.weapon_equivalents[0]?.count || 0
+      } of these!`,
+      image: stats?.weapon_equivalents[0]?.img,
+    },
+    {
+      title: "Total Votes Cast",
+      value: stats?.total_votes,
+      description: "votes have been cast by the community.",
+    },
+    {
+      title: "Unique Participants",
+      value: stats?.total_unique_participants,
+      description: "fans have participated in the consensus.",
+    },
+  ];
   const [currentWeaponIndex, setCurrentWeaponIndex] = useState(0);
   const [imagesLoaded, setImagesLoaded] = useState(false);
 
@@ -119,7 +138,7 @@ export function FunFactsSection() {
             Fun Facts
           </h2>
           <p className="text-xl text-red-200 max-w-2xl mx-auto">
-            Explore live data from the betting pool.
+            Explore live data from the prize pool.
           </p>
           <motion.div
             className="w-40 h-2 bg-gradient-to-r from-yellow-500 to-red-500 mx-auto rounded-full mt-6"
@@ -185,9 +204,9 @@ export function FunFactsSection() {
                           layoutId="weapon-count"
                         >
                           {currentWeapon.count >= 1
-                            ? currentWeapon.count.toLocaleString()
-                            : currentWeapon.raw_count !== undefined
-                            ? currentWeapon.raw_count.toFixed(2)
+                            ? Math.floor(currentWeapon.count).toLocaleString()
+                            : currentWeapon.count !== undefined
+                            ? currentWeapon.count.toFixed(2)
                             : "0.00"}
                         </motion.div>
                       </AnimatePresence>
@@ -296,53 +315,7 @@ export function FunFactsSection() {
             </Card>
           </motion.div>
 
-          {/* Leaderboard Card - NOW AT THE BOTTOM */}
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            viewport={{ once: true }}
-          >
-            <Card className="glass-black p-6 lg:p-8 rounded-2xl border-2 border-red-500/30 h-full">
-              <CardHeader className="text-center p-0 mb-6">
-                <CardTitle className="text-3xl font-bold text-red-100 tracking-wider">
-                  Top Bettors Leaderboard
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="space-y-4">
-                  {leaderboardLoading
-                    ? [...Array(5)].map((_, i) => (
-                        <Skeleton
-                          key={i}
-                          className="h-12 w-full bg-red-900/50 rounded-lg"
-                        />
-                      ))
-                    : leaderboard?.map((bettor, index) => (
-                        <motion.div
-                          key={bettor.address}
-                          className="flex items-center justify-between bg-red-900/30 p-4 rounded-lg"
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ duration: 0.5, delay: index * 0.1 }}
-                        >
-                          <div className="flex items-center space-x-4">
-                            <span className="text-2xl font-bold w-8 text-center">
-                              {rankIcons[bettor.rank] || bettor.rank}
-                            </span>
-                            <span className="font-semibold text-red-200">
-                              {formatAddress(bettor.address)}
-                            </span>
-                          </div>
-                          <span className="font-bold text-yellow-300 text-lg">
-                            {bettor.total_bet_eth.toFixed(3)} ETH
-                          </span>
-                        </motion.div>
-                      ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+          {/* Leaderboard Card has been removed as the feature is no longer supported. */}
         </div>
       </div>
     </motion.section>

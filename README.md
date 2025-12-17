@@ -1,8 +1,18 @@
-# Singapore Major Bet: A Decentralized CS2 Tournament Betting Platform
+# Singapore Major Fan Consensus Protocol: Rally Behind Your Champions
 
-> In the high-stakes world of competitive Counter-Strike, transparency and fairness are paramount. Singapore Major Bet reimagines tournament wagering by leveraging the power of Web3, creating a fully decentralized, transparent, and engaging betting experience built on the Ethereum blockchain.
+## 🏆 About the 2026 Singapore CS2 Major
 
-This platform moves beyond traditional betting systems by recording every wager as a transaction on a public ledger. This ensures unparalleled transparency, where prize pools are governed by smart contracts and every participant can verify the integrity of the system.
+The **2026 Counter-Strike 2 Major Championship** is coming to Singapore, marking a historic moment for the Asian esports scene. As one of the most prestigious tournaments in competitive gaming, the Major will bring together the world's elite CS2 teams to compete for glory in Southeast Asia's vibrant gaming hub.
+
+This tournament represents more than just competition - it's a celebration of the global Counter-Strike community's passion, dedication, and sportsmanship. Singapore's world-class infrastructure and thriving gaming culture make it the perfect stage for this landmark event.
+
+---
+
+> **Unite the CS2 Community Through Blockchain-Powered Team Support**
+>
+> In the vibrant world of competitive Counter-Strike, every fan's voice matters. Singapore Major Fan Consensus Protocol transforms team support into a transparent, community-driven celebration where fans rally behind their champions using Sepolia testnet credits. Built on Ethereum's public blockchain, every show of support becomes part of an immutable record that strengthens the bond between CS2 players and the Web3 developer community.
+
+**Our Mission:** Using free Sepolia ETH as symbolic credits, we share in our champions' honor and channel this collective energy toward empowering Web3 developers to build bridges with the Steam ecosystem. Together, we're creating a thriving, interconnected community where CS players and blockchain innovators collaborate to shape the future of competitive gaming.
 
 ---
 
@@ -14,26 +24,26 @@ This platform moves beyond traditional betting systems by recording every wager 
 
 ## Core Features
 
--   **Decentralized Betting Engine**: All bets are processed as blockchain transactions, ensuring security and eliminating the need for a trusted third party.
--   **Real-time Prize Pool**: Watch the total prize pool grow in real-time as fans from around the world back their favorite teams.
--   **Live On-Chain Data**: Utilizes a robust backend to monitor the blockchain, synchronizing every bet to provide up-to-the-minute statistics and team standings.
--   **Dynamic Visualizations**: The "Prize Pool Power" feature translates the current prize pool's value into iconic, high-value CS2 skins like the AWP | Dragon Lore, offering a compelling, tangible representation of the stakes.
--   **Top Bettors Leaderboard**: A live-updating leaderboard showcases the top participants, fostering a competitive and engaging community environment.
--   **Seamless Wallet Integration**: Effortlessly connect with popular Web3 wallets like MetaMask through RainbowKit for a smooth and secure user experience.
+- **Community-Powered Support System**: Every show of support is recorded as a blockchain transaction, creating a transparent, verifiable record of our collective rally behind the teams we believe in.
+- **Real-time Victory Vault**: Watch the community's collective support grow as fans worldwide unite behind their champions, all powered by free Sepolia testnet credits.
+- **Live Blockchain Transparency**: Our backend continuously monitors the blockchain, providing real-time updates on team support levels and community engagement statistics.
+- **Weapon Equivalents Visualization**: See the Victory Vault's value represented through iconic CS2 skins like the AWP | Dragon Lore, bridging the gaming and blockchain worlds in a tangible way.
+- **Top Champions Leaderboard**: Celebrate the most dedicated supporters with a live-updating leaderboard that showcases community leaders who rally hardest for their teams.
+- **Seamless Web3 Experience**: Connect effortlessly with MetaMask and other Web3 wallets through RainbowKit, making blockchain participation accessible to every CS2 fan.
 
 ---
 
 ## The Technology Stack
 
-This project is a full-stack decentralized application, combining a modern web frontend, a robust data-serving backend, and the immutable logic of blockchain smart contracts.
+This project bridges the CS2 gaming community with Web3 technology, creating an educational platform that demonstrates how blockchain can enhance fan engagement while using free testnet resources.
 
-| Category      | Technology                                                                                                  | Description                                                                 |
-| :------------ | :---------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------- |
-| **Frontend**  | Next.js, React, TypeScript, Tailwind CSS                                                                    | A high-performance, type-safe, and beautifully styled user interface.       |
-| **Web3 Libs** | Wagmi, RainbowKit, Viem                                                                                     | A powerful and modern toolset for interacting with the Ethereum blockchain. |
-| **Backend**   | Python, Flask, SQLAlchemy                                                                                   | A lightweight and powerful backend for serving data and syncing with the chain. |
-| **Blockchain**| Ethereum (Sepolia Testnet), Web3.py                                                                         | The foundation of the decentralized application, ensuring security and trust. |
-| **Deployment**| Render.com, Gunicorn                                                                                        | A modern, scalable infrastructure for deploying both frontend and backend services. |
+| Category       | Technology                               | Description                                                                                |
+| :------------- | :--------------------------------------- | :----------------------------------------------------------------------------------------- |
+| **Frontend**   | Next.js, React, TypeScript, Tailwind CSS | A high-performance interface designed for seamless fan interaction and team support.       |
+| **Web3 Libs**  | Wagmi, RainbowKit, Viem                  | Modern Web3 tools empowering CS2 fans to participate in blockchain-based community events. |
+| **Backend**    | Python, Flask, SQLAlchemy                | A reliable data layer synchronizing blockchain activity with community statistics.         |
+| **Blockchain** | Ethereum (Sepolia Testnet), Web3.py      | Free testnet infrastructure enabling risk-free exploration of Web3 for CS2 enthusiasts.    |
+| **Deployment** | Render.com, Gunicorn                     | Scalable cloud infrastructure ensuring reliable access for the global CS2 community.       |
 
 ---
 
@@ -49,7 +59,7 @@ graph TB
     C -->|Event Listening & Syncing| D
     C -->|Read/Write| E[(SQLite Database)]
     D -->|On-Chain State| F[Blockchain Ledger]
-    
+
     style A fill:#f9f,stroke:#333,stroke-width:2px
     style B fill:#bbf,stroke:#333,stroke-width:2px
     style C fill:#bfb,stroke:#333,stroke-width:2px
@@ -60,16 +70,16 @@ graph TB
 
 ### Data Flow
 
-1.  **The Smart Contract**: Deployed on the Ethereum blockchain, the contract is the ultimate source of truth. It securely holds all funds, defines the betting logic, and ensures that payouts are handled according to predetermined rules.
-2.  **The Backend (Flask & Web3.py)**: This service acts as a vital bridge. It runs a persistent listener that monitors the blockchain for new betting transactions. It then indexes this data into a local database (SQLite) to power the API, providing the frontend with aggregated statistics, leaderboards, and team-specific data without requiring every user to query the blockchain directly.
-3.  **The Frontend (Next.js)**: The user-facing application that consumes data from the backend API. It provides a rich, interactive experience, handles wallet connections, and allows users to construct and send their betting transactions to the smart contract.
+1.  **The Smart Contract**: Deployed on Ethereum's Sepolia testnet, the contract serves as the transparent foundation for our community support system. It manages the Victory Vault using free testnet credits, implements fair distribution logic, and ensures every participant can verify the process.
+2.  **The Backend (Flask & Web3.py)**: This service bridges blockchain technology with accessible data visualization. It monitors the blockchain for community support activities, indexes participation into a local database, and powers the API that delivers real-time statistics, leaderboards, and team engagement metrics to all fans.
+3.  **The Frontend (Next.js)**: The community-facing platform where CS2 fans connect their wallets and rally behind their chosen teams. It delivers an engaging experience that makes blockchain participation intuitive and rewarding, transforming complex Web3 concepts into familiar fan support actions.
 
 ---
 
 ## Project Structure
 
 ```
-Singapore-Major-Bet/
+Singapore-Major-Fan-Consensus/
 │
 ├── backend/                      # Flask backend service
 │   ├── app.py                    # Main application logic
@@ -100,18 +110,18 @@ This project is designed for a separated frontend and backend deployment, a stan
 
 ### Deployment Guides
 
--   **[Deployment Sequence](DEPLOY_SEQUENCE.md)**: The complete, ordered guide for deploying all services.
--   **[Architectural Reasoning](WHY_SEPARATE_DEPLOY.md)**: An explanation of the benefits of this deployment strategy.
--   **[Backend Deployment Guide](DEPLOYMENT.md)**: Detailed instructions for deploying the Flask backend on Render.
--   **[Frontend Deployment Guide](FRONTEND_DEPLOY.md)**: Detailed instructions for deploying the Next.js frontend on Render.
+- **[Deployment Sequence](DEPLOY_SEQUENCE.md)**: The complete, ordered guide for deploying all services.
+- **[Architectural Reasoning](WHY_SEPARATE_DEPLOY.md)**: An explanation of the benefits of this deployment strategy.
+- **[Backend Deployment Guide](DEPLOYMENT.md)**: Detailed instructions for deploying the Flask backend on Render.
+- **[Frontend Deployment Guide](FRONTEND_DEPLOY.md)**: Detailed instructions for deploying the Next.js frontend on Render.
 
 ### Quick Deployment Overview
 
-| Service    | Platform    | Technology       | URL Pattern                                      |
-| :--------- | :---------- | :--------------- | :----------------------------------------------- |
-| Backend    | Render.com  | Flask + Gunicorn | `https://singapore-major-bet-backend.onrender.com`         |
-| Frontend   | Render.com  | Next.js          | `https://singapore-major-bet-frontend.onrender.com`        |
-| Blockchain | Sepolia     | Ethereum Testnet | Accessible via RPC endpoint                      |
+| Service    | Platform   | Technology       | URL Pattern                                                   |
+| :--------- | :--------- | :--------------- | :------------------------------------------------------------ |
+| Backend    | Render.com | Flask + Gunicorn | `https://singapore-major-fan-consensus-backend.onrender.com`  |
+| Frontend   | Render.com | Next.js          | `https://singapore-major-fan-consensus-frontend.onrender.com` |
+| Blockchain | Sepolia    | Ethereum Testnet | Accessible via RPC endpoint                                   |
 
 ---
 
@@ -119,9 +129,9 @@ This project is designed for a separated frontend and backend deployment, a stan
 
 ### Prerequisites
 
--   **Node.js** (v18+) and **npm**
--   **Python** (3.10+) and **uv** (or pip)
--   **MetaMask** or another Web3 wallet with Sepolia ETH
+- **Node.js** (v18+) and **npm**
+- **Python** (3.10+) and **uv** (or pip)
+- **MetaMask** or another Web3 wallet with Sepolia ETH
 
 ### Backend Setup
 
@@ -155,39 +165,55 @@ Frontend will be available at `http://localhost:3000`
 
 ### Blockchain Interaction
 
--   **Smart Contract Functions**: The platform interacts with a custom betting smart contract deployed on Sepolia. Core functions include `bet(uint256 _teamId)` for placing bets and `getTeams()` for retrieving team data.
--   **Event Listening**: The backend continuously monitors the blockchain using the Etherscan API, detecting new bet transactions in real-time and updating the database accordingly.
--   **Web3 Wallet Integration**: Users connect their MetaMask wallets via RainbowKit, allowing them to sign transactions directly from the browser.
+- **Smart Contract Functions**: Our platform interacts with a community support smart contract deployed on Sepolia testnet. Core functions include `predict(uint256 _teamId)` for rallying behind teams and `getTeams()` for retrieving team data - all powered by free testnet credits.
+- **Event Listening**: The backend continuously monitors blockchain activity using the Etherscan API, detecting new community support actions in real-time and celebrating participant contributions through database updates.
+- **Web3 Wallet Integration**: Fans connect their MetaMask wallets via RainbowKit, experiencing seamless blockchain participation that feels as natural as traditional fan engagement platforms.
 
-### Real-Time Data Synchronization
+### Real-Time Community Updates
 
--   **Dual-Source Updates**: The database is updated both by a background thread that listens for blockchain events and by manual API calls triggered by the frontend after a successful transaction. This dual approach ensures data is up-to-date with minimal delay.
--   **Live Price Fetching**: The Dragon Lore price is fetched from a custom API (`buffotte.hezhili.online`) and converted from CNY to USD using the Frankfurter exchange rate API, ensuring that the "Prize Pool Power" visualization reflects current market values.
+- **Dual-Source Synchronization**: Our system updates community statistics both through blockchain event monitoring and immediate frontend triggers after successful support actions. This ensures fans see their contributions reflected instantly, celebrating every participant's impact.
+- **Live Weapon Price Data**: CS2 weapon prices are fetched from real-time market APIs and converted to USD, making the "Weapon Equivalents" feature both educational and culturally relevant - showing how testnet credits translate to real gaming economy values.
 
 ### Modern Frontend Patterns
 
--   **Type Safety**: TypeScript is used throughout the frontend, with strict type definitions for all API responses and component props.
--   **Data Fetching**: TanStack Query (React Query) is used for efficient data fetching, caching, and background updates with configurable refetch intervals.
--   **UI/UX**: Framer Motion provides smooth animations, while Radix UI components ensure accessible and robust UI elements.
+- **Type Safety**: TypeScript is used throughout the frontend, with strict type definitions for all API responses and component props.
+- **Data Fetching**: TanStack Query (React Query) is used for efficient data fetching, caching, and background updates with configurable refetch intervals.
+- **UI/UX**: Framer Motion provides smooth animations, while Radix UI components ensure accessible and robust UI elements.
 
 ---
 
-## Contributing
+## Join Our Mission
 
-This project is a demonstration of Web3 application development principles and is open to contributions. If you have ideas for improvements, new features, or bug fixes, please feel free to open an issue or submit a pull request.
+This platform demonstrates how Web3 technology can unite gaming communities and empower developers to build meaningful connections between traditional gaming platforms like Steam and the blockchain ecosystem. We welcome contributions from:
 
----
+- **CS2 Players**: Share feedback on fan engagement features
+- **Web3 Developers**: Help us refine blockchain integration patterns
+- **Community Builders**: Suggest ways to strengthen player-developer collaboration
 
-## License
-
-This project is developed as part of an academic course and is intended for educational purposes. Please refer to the license file for more details.
-
----
-
-## Contact & Support
-
-For questions, feedback, or collaboration inquiries, please open an issue on this repository or contact the project maintainer.
+If you have ideas for improvements or want to join our mission, please open an issue or submit a pull request.
 
 ---
 
-**Built with passion for the CS2 community and the future of decentralized applications.**
+## Educational Mission
+
+This project serves as an educational bridge between gaming and blockchain communities. By using free Sepolia testnet credits, we eliminate financial barriers and create a risk-free environment where:
+
+- CS2 fans learn Web3 concepts through familiar team support mechanics
+- Web3 developers explore Steam ecosystem integration opportunities
+- Both communities collaborate on building the future of competitive gaming infrastructure
+
+All participation uses testnet resources - no real financial investment required.
+
+---
+
+## Community & Support
+
+Questions about Web3 integration? Curious about Steam-blockchain bridges? Want to collaborate on CS2 community projects?
+
+Open an issue on this repository and join the conversation. Together, we're building connections that will help Web3 developers create more inclusive, engaging experiences for the global CS2 community.
+
+---
+
+**Built with dedication to unite CS2 players and Web3 developers in creating a thriving, collaborative gaming ecosystem.**
+
+**Every Sepolia credit shared represents a step toward a more connected, empowered community where gaming passion meets blockchain innovation.**

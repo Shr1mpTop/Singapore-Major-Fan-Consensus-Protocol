@@ -24,11 +24,11 @@ import { parseEther } from "viem";
 import { useQueryClient } from "@tanstack/react-query";
 import { WithdrawSection } from "@/components/WithdrawSection";
 
-// 合约ABI - bet函数
-const BET_ABI = [
+// 合约ABI - vote函数
+const VOTE_ABI = [
   {
     inputs: [{ internalType: "uint256", name: "_teamId", type: "uint256" }],
-    name: "bet",
+    name: "vote",
     outputs: [],
     stateMutability: "payable",
     type: "function",
@@ -36,12 +36,11 @@ const BET_ABI = [
 ] as const;
 
 // 合约地址
-const CONTRACT_ADDRESS: `0x${string}` = (process.env
-  .NEXT_PUBLIC_CONTRACT_ADDRESS ||
-  "0xb5c4bea741cea63b2151d719b2cca12e80e6c7e8") as `0x${string}`;
+const CONTRACT_ADDRESS: `0x${string}` = process.env
+  .NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
 
-// Single team betting card component
-function TeamBetCard({
+// Single team voting card component
+function TeamVoteCard({
   team,
   totalPool,
 }: {
@@ -51,13 +50,13 @@ function TeamBetCard({
   // 从 TeamData 转换/重命名 props 以匹配组件的期望
   const teamProps = {
     ...team,
-    total_bet_wei: (team.prize_pool_eth * 10 ** 18).toString(),
-    supporters: team.bets_count,
+    total_vote_wei: (team.prize_pool_eth * 10 ** 18).toString(),
+    supporters: team.votes_count,
   };
 
-  console.log("TeamBetCard rendering for team:", team.id, team.name);
+  console.log("TeamVoteCard rendering for team:", team.id, team.name);
 
-  const [betAmount, setBetAmount] = useState("");
+  const [voteAmount, setVoteAmount] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
   const {
@@ -76,7 +75,7 @@ function TeamBetCard({
   });
 
   // 添加调试信息
-  console.log("TeamBetCard render:", {
+  console.log("TeamVoteCard render:", {
     teamId: team.id,
     address,
     isPending,
@@ -91,10 +90,10 @@ function TeamBetCard({
     if (isSuccess && address) {
       // Transaction successful - backend event listeners will automatically sync on-chain data
       console.log(
-        "Bet transaction successful, backend will sync automatically via event listeners"
+        "Vote transaction successful, backend will sync automatically via event listeners"
       );
 
-      // Invalidate queries to refetch data after a successful bet
+      // Invalidate queries to refetch data after a successful vote
       // Add a delay to allow backend event listeners to process transaction
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["teams"] });
@@ -103,15 +102,15 @@ function TeamBetCard({
 
         // 关闭弹窗和重置状态
         setIsOpen(false);
-        setBetAmount("");
+        setVoteAmount("");
         reset();
       }, 5000); // Wait 5 seconds for backend to sync
     }
-  }, [isSuccess, address, team.id, betAmount, queryClient, reset]);
+  }, [isSuccess, address, team.id, voteAmount, queryClient, reset]);
 
   const calculateOdds = () => {
-    const userAmount = parseFloat(betAmount) || 0;
-    const teamPool = parseFloat(teamProps.total_bet_wei) / 10 ** 18;
+    const userAmount = parseFloat(voteAmount) || 0;
+    const teamPool = parseFloat(teamProps.total_vote_wei) / 10 ** 18;
     const totalPoolAmount =
       parseFloat(status?.total_prize_pool_wei || "0") / 10 ** 18;
     const finalPool = totalPoolAmount * 0.9;
@@ -119,17 +118,17 @@ function TeamBetCard({
     return (userAmount / teamPool) * finalPool;
   };
 
-  const handleBet = async () => {
-    alert("handleBet 被调用了！"); // 添加alert确保函数被调用
-    console.log("handleBet called");
+  const handleVote = async () => {
+    alert("handleVote 被调用了！"); // 添加alert确保函数被调用
+    console.log("handleVote called");
 
     if (
-      !betAmount ||
-      isNaN(parseFloat(betAmount)) ||
-      parseFloat(betAmount) <= 0
+      !voteAmount ||
+      isNaN(parseFloat(voteAmount)) ||
+      parseFloat(voteAmount) <= 0
     ) {
-      console.log("Invalid bet amount:", betAmount);
-      alert("Please enter a valid bet amount (number greater than 0)");
+      console.log("Invalid vote amount:", voteAmount);
+      alert("Please enter a valid vote amount (number greater than 0)");
       return;
     }
 
@@ -139,17 +138,17 @@ function TeamBetCard({
       return;
     }
 
-    const amountInWei = parseEther(betAmount);
+    const amountInWei = parseEther(voteAmount);
 
-    console.log("Placing bet:", {
+    console.log("Placing vote:", {
       teamId: teamProps.id,
       teamName: teamProps.name,
-      amount: betAmount,
+      amount: voteAmount,
       amountInWei: amountInWei.toString(),
       contractAddress: CONTRACT_ADDRESS,
       userAddress: address,
       expectedChainId: 11155111, // Sepolia
-      betAbi: BET_ABI,
+      voteAbi: VOTE_ABI,
     });
 
     // 检查是否在正确的网络上
@@ -172,7 +171,7 @@ function TeamBetCard({
     try {
       console.log("Calling writeContract with params:", {
         address: CONTRACT_ADDRESS,
-        functionName: "bet",
+        functionName: "vote",
         args: [BigInt(teamProps.id)],
         value: amountInWei.toString(),
         gas: "100000",
@@ -180,8 +179,8 @@ function TeamBetCard({
 
       writeContract({
         address: CONTRACT_ADDRESS,
-        abi: BET_ABI,
-        functionName: "bet",
+        abi: VOTE_ABI,
+        functionName: "vote",
         args: [BigInt(teamProps.id)],
         value: amountInWei,
         gas: BigInt(200000), // 增加 gas limit
@@ -201,7 +200,7 @@ function TeamBetCard({
     setIsOpen(open);
     if (!open && !isSuccess) {
       // 关闭时重置状态，如果不是成功关闭
-      setBetAmount("");
+      setVoteAmount("");
       reset();
     }
   };
@@ -213,8 +212,8 @@ function TeamBetCard({
       </CardHeader>
       <CardContent>
         <p className="text-sm text-red-200">
-          Total Bets:{" "}
-          {(parseFloat(teamProps.total_bet_wei) / 10 ** 18).toFixed(6)} ETH
+          Total Votes:{" "}
+          {(parseFloat(teamProps.total_vote_wei) / 10 ** 18).toFixed(6)} ETH
         </p>
         <p className="text-sm text-red-200">
           Supporters: {teamProps.supporters}
@@ -223,35 +222,35 @@ function TeamBetCard({
         <Dialog open={isOpen} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button className="w-full mt-4 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white glow-hover">
-              Bet
+              Vote
             </Button>
           </DialogTrigger>
           <DialogContent className="glass-red border-red-400/30 text-white">
             <DialogHeader>
               <DialogTitle className="text-red-300">
-                Bet on {teamProps.name}
+                Vote on {teamProps.name}
               </DialogTitle>
               <DialogDescription className="text-red-200">
-                Enter your bet amount and confirm the transaction. Team ID:{" "}
+                Enter your vote amount and confirm the transaction. Team ID:{" "}
                 {teamProps.id}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm mb-2 text-white">
-                  Bet Amount (ETH)
+                  Vote Amount (ETH)
                 </label>
                 <Input
                   type="number"
                   step="0.001"
                   min="0"
-                  value={betAmount}
-                  onChange={(e) => setBetAmount(e.target.value)}
+                  value={voteAmount}
+                  onChange={(e) => setVoteAmount(e.target.value)}
                   placeholder="0.01"
                   className="bg-red-900/50 border-red-400/50 text-white placeholder-red-300"
                 />
               </div>
-              {betAmount && parseFloat(betAmount) > 0 && (
+              {voteAmount && parseFloat(voteAmount) > 0 && (
                 <div className="p-4 bg-red-900/30 rounded border border-red-400/30">
                   <p className="text-sm text-red-100">
                     Expected Payout: {calculateOdds().toFixed(6)} ETH
@@ -275,19 +274,19 @@ function TeamBetCard({
               )}
               <Button
                 className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold glow-hover border border-red-400/50"
-                onClick={handleBet}
+                onClick={handleVote}
                 disabled={
                   isPending ||
                   isConfirming ||
-                  !betAmount ||
-                  parseFloat(betAmount) <= 0
+                  !voteAmount ||
+                  parseFloat(voteAmount) <= 0
                 }
               >
                 {isPending
                   ? "Confirm in wallet..."
                   : isConfirming
                   ? "Transaction processing..."
-                  : `Confirm Bet ${betAmount || "0"} ETH`}
+                  : `Confirm Vote ${voteAmount || "0"} ETH`}
               </Button>
             </div>
           </DialogContent>
@@ -312,7 +311,7 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center text-white">
-          <h1 className="text-2xl mb-4">Betting Closed</h1>
+          <h1 className="text-2xl mb-4">Voting Closed</h1>
           <p className="text-slate-400">Current Status: {status.status_text}</p>
           {status.winning_team_id !== null && status.winning_team_id !== 0 && (
             <p className="text-yellow-400 mt-2">
@@ -357,7 +356,7 @@ export default function Dashboard() {
         <div className="max-w-4xl mx-auto px-4 py-8 relative z-10">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-red-100 mb-4">
-              Betting Closed
+              Voting Closed
             </h1>
             <p className="text-red-200 text-xl">
               Current Status: {status.status_text}
@@ -408,7 +407,9 @@ export default function Dashboard() {
 
       <header className="p-4 border-b border-red-400/30 relative z-10">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold text-glow">CS2 Major Betting</h1>
+          <h1 className="text-xl font-bold text-glow">
+            CS2 Major Fan Consensus
+          </h1>
           <ConnectButton />
         </div>
       </header>
@@ -417,7 +418,7 @@ export default function Dashboard() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8 glass-red rounded-xl p-6 glow">
             <h2 className="text-2xl font-bold mb-2 text-red-100">
-              Select Team to Bet
+              Select Team to Support
             </h2>
             <p className="text-red-200">
               Current Total Prize Pool: {totalPool.toFixed(6)} ETH
@@ -437,7 +438,7 @@ export default function Dashboard() {
                   </Card>
                 ))
               : teams?.map((team) => (
-                  <TeamBetCard
+                  <TeamVoteCard
                     key={team.id}
                     team={team}
                     totalPool={totalPool}

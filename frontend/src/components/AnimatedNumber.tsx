@@ -16,12 +16,12 @@ export function AnimatedNumber({
   className = "",
   decimals = 2,
 }: AnimatedNumberProps) {
-  const [displayValue, setDisplayValue] = useState(value);
-  const motionValue = useMotionValue(value);
+  const [displayValue, setDisplayValue] = useState(value || 0);
+  const motionValue = useMotionValue(value || 0);
   const springValue = useSpring(motionValue, { duration: duration * 1000 });
 
   useEffect(() => {
-    motionValue.set(value);
+    motionValue.set(value || 0);
   }, [motionValue, value]);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export function AnimatedNumber({
 
   return (
     <motion.span className={className}>
-      {displayValue.toFixed(decimals)}
+      {(displayValue || 0).toFixed(decimals)}
     </motion.span>
   );
 }

@@ -2,7 +2,7 @@
 services:
   # Flask 后端服务
   - type: web
-    name: singapore-major-bet-backend
+    name: singapore-major-fan-consensus-backend
     runtime: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn --config gunicorn.conf.py app:app"
